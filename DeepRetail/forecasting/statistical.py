@@ -19,8 +19,8 @@ class StatisticalForecaster(object):
         self,
         df,
         freq,
-        observation_threshold,
-        trailing_zeros_threshold,
+        observation_threshold=None,
+        trailing_zeros_threshold=None,
         total_to_forecast="all",
     ):
 
@@ -55,16 +55,19 @@ class StatisticalForecaster(object):
         )
 
         # filter
-        obs_count_f = obs_count[
-            (obs_count["Total_Observations"] > observation_threshold)
-            & (obs_count["Trailing_Zeros"] < trailing_zeros_threshold)
-        ]
+        if observation_threshold is not None:
+            obs_count_f = obs_count[
+                (obs_count["Total_Observations"] > observation_threshold)
+            ]
+        if trailing_zeros_threshold is not None:
+            obs_count_f = obs_count_f["Trailing_Zeros"] < trailing_zeros_threshold
+
         ids = obs_count_f.reset_index()["unique_id"].unique()
         fc_df = df.loc[ids]
 
         # Give a summary of the selection
         print(
-            f"From a total of {df.shape[0]}, {fc_df.shape[0]} \ fullfill the conditions for forecasting"
+            f"From a total of {df.shape[0]}, {fc_df.shape[0]}  fullfill the conditions for forecasting"
         )
 
         # convert to the right format for stats forecasts
@@ -89,6 +92,10 @@ class StatisticalForecaster(object):
         self.forecaster = forecaster
 
     def predict(self, fh, cv=None, parallel=True):
+
+        # if we do not have cv
+        if cv is None:
+            cv = 1  # set it to 1 to deal with some issues
 
         if parallel:
             # For parallelism use ray
