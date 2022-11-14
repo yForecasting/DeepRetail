@@ -123,3 +123,36 @@ def remove_gifts(p, q):
         return 1
     else:
         return 0
+
+
+def forecast_format(df, format="transaction"):
+    """Converts a df to the required format for sktime's AutoETS
+
+    Args:
+        df (pd.DataFrame): The dataframe in either pivot or transcation format
+        format (str, optional): The format. Defaults to 'transaction'.
+
+    Returns:
+        pd.DataFrame: The converted dataframe.
+    """
+
+    # if we have the transaction format
+    if format == "transaction":
+
+        # rename and pivot
+        df = df.rename(columns={"date": "Period"})
+        df = pd.pivot_table(
+            df, index="Period", columns="unique_id", values="y", aggfunc="first"
+        )
+
+        # Drop the name on the columns
+        df.columns.name = None
+
+    else:
+        # Droping the name of the index
+        df.index.name = None
+
+        # Transpose and rename
+        df.T.rename_axis("Period").head()
+
+    return df
