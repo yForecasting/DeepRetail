@@ -1,10 +1,20 @@
 import ray
 import pandas as pd
-from DeepRetail.forecasting.extras import for_ray
-from DeepRetail.preprocessing.converters import transaction_df
-from statsforecast import StatsForecast
-from statsforecast.models import SeasonalNaive, WindowAverage, Naive, ETS, AutoARIMA
 import numpy as np
+
+from DeepRetail.forecasting.extras import fit_predict, add_fh_cv
+from DeepRetail.preprocessing.converters import transaction_df, forecast_format
+
+from sktime.forecasting.ets import AutoETS
+from sktime.forecasting.naive import NaiveForecaster
+from sktime.forecasting.model_selection import (
+    SlidingWindowSplitter,
+    temporal_train_test_split,
+    ForecastingGridSearchCV,
+    ExpandingWindowSplitter,
+)
+from sktime.forecasting.base import ForecastingHorizon
+from sktime.forecasting.statsforecast import StatsForecastAutoARIMA
 
 
 class StatisticalForecaster(object):
@@ -33,50 +43,56 @@ class StatisticalForecaster(object):
 
         # Generate the model list
         models_to_fit = []
-
+        model_names = []
         # Append to the list
         if "Naive" in self.models:
-            models_to_fit.append(Naive())
+            models_to_fit.append(NaiveForecaster(strategy="last"))
+            model_names.append("Naive")
         if "SNaive" in self.models:
-            models_to_fit.append(SeasonalNaive(season_length=self.seasonal_length))
-        if "MovingAverage" in self.models:
-            models_to_fit.append(WindowAverage(self.window_length))
-        if "ETS" in self.models:
-            models_to_fit.append(ETS(season_length=self.seasonal_length))
+            models_to_fit.append(
+                NaiveForecaster(strategy="last", sp=self.seasonal_length)
+            )
+            model_names.append("Seasonal Naive")
         if "ARIMA" in self.models:
-            models_to_fit.append(AutoARIMA(season_length=self.seasonal_length))
+            models_to_fit.append(
+                StatsForecastAutoARIMA(sp=self.seasonal_length, n_jobs=self.n_jobs)
+            )
+            model_names.append("ARIMA")
+        if "ETS" in self.models:
+            models_to_fit.append(
+                AutoETS(auto=True, sp=self.seasonal_length, n_jobs=self.n_jobs)
+            )
+            model_names.append("ETS")
+        # Note -> More models to be added here!
 
         # Estimate number of non-zero observations and trailing zeros
         obs_count = pd.DataFrame(df.shape[1] - df.isin([0]).sum(axis=1)).rename(
             columns={0: "Total_Observations"}
         )
-        obs_count["Trailing_Zeros"] = (
-            df.iloc[:, -trailing_zeros_threshold:].isin([0]).sum(axis=1)
-        )
+
+        if trailing_zeros_threshold is not None:
+            obs_count["Trailing_Zeros"] = (
+                df.iloc[:, -trailing_zeros_threshold:].isin([0]).sum(axis=1)
+            )
 
         # filter
         if observation_threshold is not None:
-            obs_count_f = obs_count[
+            obs_count = obs_count[
                 (obs_count["Total_Observations"] > observation_threshold)
             ]
         if trailing_zeros_threshold is not None:
-            obs_count_f = obs_count_f["Trailing_Zeros"] < trailing_zeros_threshold
+            obs_count = obs_count["Trailing_Zeros"] < trailing_zeros_threshold
 
-        ids = obs_count_f.reset_index()["unique_id"].unique()
+        ids = obs_count.reset_index()["unique_id"].unique()
         fc_df = df.loc[ids]
 
         # Give a summary of the selection
         print(
-            f"From a total of {df.shape[0]}, {fc_df.shape[0]}  fullfill the conditions for forecasting"
+            f"From a total of {df.shape[0]}, {fc_df.shape[0]}  fullfill the conditions."
         )
 
-        # convert to the right format for stats forecasts
-        # simply renaming
+        # convert to the right format
         fc_df = transaction_df(fc_df, keep_zeros=False)
-
-        # Prepare the date column
-        fc_df = fc_df.rename(columns={"date": "ds"})
-        fc_df["ds"] = pd.to_datetime(fc_df["ds"])
 
         if total_to_forecast != "all":
             # Take a sample
@@ -84,28 +100,51 @@ class StatisticalForecaster(object):
             sample = np.random.choice(ids, 15)
             fc_df = fc_df[fc_df["unique_id"].isin(sample)]
 
-        # Define the forecaster
-        forecaster = StatsForecast(
-            df=fc_df, models=models_to_fit, freq=freq, n_jobs=self.n_jobs
+        # Edit for ETS here
+        fc_df = forecast_format(fc_df)
+
+        # Fix an issue with frequencies.
+        fc_df = fc_df.asfreq(freq)
+
+        # Complete the fit.
+        self.fitted_models = models_to_fit
+        self.fc_df = fc_df
+        self.model_names = model_names
+
+    def predict(self, h, cv=1):
+
+        # If CV is None then we predict out-of-sample without true values!
+        # Still under construction!
+
+        # Prepare the parameters for predicting
+        fh = np.arange(1, h + 1, 1)  # sktime forecast horizon
+        # Split
+        y_train, y_test = temporal_train_test_split(self.fc_df, test_size=h)
+        # Convert y_test to the selected format
+        y_test = pd.melt(
+            y_test.reset_index(),
+            id_vars=["Period"],
+            value_vars=y_test.columns[1:],
+            value_name="True",
+            var_name="unique_id",
+        ).rename(columns={"Period": "date"})
+        # Prepare the cross_val
+        cross_val = SlidingWindowSplitter(
+            window_length=len(self.fc_df) - h - (cv - 1), fh=fh, step_length=1
         )
-        # Complete the fit
-        self.forecaster = forecaster
 
-    def predict(self, fh, cv=None, parallel=True):
+        # Make predictions for every model and stack them
+        y_pred = pd.concat(
+            [
+                fit_predict(model, self.fc_df, y_train, fh, cross_val, name)
+                for model, name in zip(self.fitted_models, self.model_names)
+            ]
+        )
 
-        # if we do not have cv
-        if cv is None:
-            cv = 1  # set it to 1 to deal with some issues
+        # Add the true values
+        y_out = pd.merge(y_pred, y_test, on=["unique_id", "date"])
 
-        if parallel:
-            # For parallelism use ray
-            res_df = ray.get(for_ray.remote(self.forecaster, fh, cv))
+        # Add the cv and the fh
+        y_out = add_fh_cv(y_out)
 
-        # for no parallelism just forecast
-        else:
-            if cv is None:
-                res_df = self.forecaster.forecast(h=fh)
-            else:
-                res_df = self.forecaster.cross_validation(h=fh, n_windows=cv)
-
-        return res_df
+        return y_out
