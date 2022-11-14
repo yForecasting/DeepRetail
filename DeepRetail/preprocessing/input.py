@@ -120,6 +120,10 @@ class Reader(object):
 
         # fills missing values
         temp_df = temp_df.fillna(0)
+        temp_df.columns = pd.to_datetime(temp_df.columns)
+
+        # Deals with negative values
+        temp_df[temp_df < 0] = 0
 
         # includes
         self.dataset = temp_df
