@@ -7,23 +7,27 @@ import numpy as np
 e = np.finfo(np.float64).eps
 
 
-def simple_error(actual, predicted, *args):
+def simple_error(actual, predicted, *args, **kwargs):
     # Simple difference
     return actual - predicted
 
 
-def percentage_error(actual, predicted, *args):
+def bias(actual, predicted, *args, **kwargs):
+    return np.mean(simple_error(actual, predicted, *args, **kwargs))
+
+
+def percentage_error(actual, predicted, *args, **kwargs):
     # % Error
     return simple_error(actual, predicted) / (
         actual + e
     )  # The small e asserts that division is not with 0
 
 
-def scaled_error(actual, predicted, train, scale_factor=None, lag=1, *args):
+def scaled_error(actual, predicted, train, scale_factor=None, lag=1, *args, **kwargs):
     # Scalling the error with the given factor
     # If scalling factor is not given, scales with the naive in-sample mse
 
-    error = simple_error(actual, predicted)
+    error = simple_error(actual, predicted, **kwargs)
     if scale_factor != None:
         scale_denom = scale_factor
     elif len(train) > 0:
@@ -41,21 +45,21 @@ def naive_forecasts(actual, lag=1):
     return actual[:-lag]
 
 
-def mse(actual, predicted, *args):
+def mse(actual, predicted, *args, **kwargs):
     # The mse
     return mean_squared_error(y_true=actual, y_pred=predicted)
 
 
-def rmse(actual, predicted, *args):
+def rmse(actual, predicted, *args, **kwargs):
     # for rmse just turn squared to false
     return mean_squared_error(y_true=actual, y_pred=predicted, squared=False)
 
 
-def mae(actual, predicted, *args):
+def mae(actual, predicted, *args, **kwargs):
     return mean_absolute_error(y_true=actual, y_pred=predicted)
 
 
-def mape(actual, predicted, *args):
+def mape(actual, predicted, *args, **kwargs):
     # !!!!!!!Carefull!!!!!!
     # MAPE is biased as it is not symmetric
     # MAPE is not defined for actual = 0
@@ -63,7 +67,7 @@ def mape(actual, predicted, *args):
     return np.mean(error)
 
 
-def smape(actual, predicted, *args):
+def smape(actual, predicted, *args, **kwargs):
     # Symmetric mape
     error = (
         2.0 * np.abs(actual - predicted) / ((np.abs(actual) + np.abs(predicted)) + e)
@@ -71,7 +75,7 @@ def smape(actual, predicted, *args):
     return np.mean(error)
 
 
-def mase(actual, predicted, naive_mae, train=None, lag=1, *args):
+def mase(actual, predicted, naive_mae, train=None, lag=1, *args, **kwargs):
 
     # The original MASE as proposed by "Another look at measures of forecast accuracy", Rob J Hyndman
     # Uses the in-sample Naive Forecast for scaling!
@@ -92,7 +96,7 @@ def mase(actual, predicted, naive_mae, train=None, lag=1, *args):
     return num / scale_denom
 
 
-def rmsse(actual, predicted, naive_mse=None, train=None, lag=1, *args):
+def rmsse(actual, predicted, naive_mse=None, train=None, lag=1, *args, **kwargs):
     # Reference:
     # https://github.com/alan-turing-institute/sktime/blob/main/sktime/performance_metrics/forecasting/_functions.py
     # root mean squared scaled error
