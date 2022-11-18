@@ -1,34 +1,41 @@
-import ray
+import warnings
+
+warnings.filterwarnings("ignore")
+
+
 import pandas as pd
 import numpy as np
 
 from DeepRetail.forecasting.extras import fit_predict, add_fh_cv
-from DeepRetail.preprocessing.converters import transaction_df, forecast_format
+from DeepRetail.preprocessing.converters import (
+    get_numeric_frequency,
+    transaction_df,
+    forecast_format,
+)
 
+
+# Models
 from sktime.forecasting.ets import AutoETS
 from sktime.forecasting.naive import NaiveForecaster
+from sktime.forecasting.statsforecast import StatsForecastAutoARIMA
+
 from sktime.forecasting.model_selection import (
     SlidingWindowSplitter,
     temporal_train_test_split,
-    ForecastingGridSearchCV,
-    ExpandingWindowSplitter,
 )
-from sktime.forecasting.base import ForecastingHorizon
-from sktime.forecasting.statsforecast import StatsForecastAutoARIMA
 
 
 class StatisticalForecaster(object):
-    def __init__(self, models, seasonal_length, window_length=None, n_jobs=-1):
+    def __init__(self, models, freq, n_jobs=-1):
 
         self.models = models
-        self.seasonal_length = seasonal_length
-        self.window_length = window_length
+        self.freq = freq
+        self.seasonal_length = get_numeric_frequency(freq)
         self.n_jobs = n_jobs
 
     def fit(
         self,
         df,
-        freq,
         observation_threshold=None,
         trailing_zeros_threshold=None,
         total_to_forecast="all",
@@ -87,24 +94,26 @@ class StatisticalForecaster(object):
         fc_df = df.loc[ids]
 
         # Give a summary of the selection
-        print(
-            f"From a total of {df.shape[0]}, {fc_df.shape[0]}  fullfill the conditions."
-        )
+        if (observation_threshold is not None) | (trailing_zeros_threshold is not None):
+            print(
+                f"From a total of {df.shape[0]}, {fc_df.shape[0]}  fullfill the conditions."
+            )
 
         # convert to the right format
         fc_df = transaction_df(fc_df, keep_zeros=False)
 
         if total_to_forecast != "all":
-            # Take a sample
+            # Take an ordered sample
             ids = fc_df["unique_id"].unique()
-            sample = np.random.choice(ids, 15)
+            # sample = np.random.choice(ids, 15)
+            sample = ids[:total_to_forecast]
             fc_df = fc_df[fc_df["unique_id"].isin(sample)]
 
         # Edit for ETS here
         fc_df = forecast_format(fc_df)
 
         # Fix an issue with frequencies.
-        fc_df = fc_df.asfreq(freq)
+        fc_df = fc_df.asfreq(self.freq)
 
         # Complete the fit.
         self.fitted_models = models_to_fit
