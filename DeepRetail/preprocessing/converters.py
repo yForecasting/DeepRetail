@@ -4,6 +4,7 @@
 import pandas as pd
 from collections import Counter
 import numpy as np
+from pandas.tseries.frequencies import to_offset
 
 
 def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
@@ -26,7 +27,7 @@ def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
                                     Defaults to True.
     """
 
-    # Ensure dates are on the right format
+    # Ensure dates are on the right formatI
     df["date"] = pd.to_datetime(df["date"])
 
     # Pivots on the original frequency
@@ -156,3 +157,36 @@ def forecast_format(df, format="transaction"):
         df.T.rename_axis("Period").head()
 
     return df
+
+
+def get_numeric_frequency(freq):
+    """Returns the frequency of a ts object in numeric format.
+        Refer to https://otexts.com/fpp3/tsibbles.html for details
+
+    Args:
+        ts (ts): The time series in the ts format.
+
+    Returns:
+        [int]: The frequency of the time series converted from string to number.
+    """
+
+    keys = ["Y", "A", "Q", "M", "W", "D", "H"]
+    vals = [1, 1, 4, 12, 52, 7, 24]
+
+    freq_dictionary = dict(zip(keys, vals))
+
+    # Getting the period and the frequency
+    period = to_offset(freq).n
+
+    # Taking the first letter of the frequency in case we have MS for month start etc
+    freq = to_offset(freq).name[0]
+
+    # Initializing the dictionary
+    numeric_freq = freq_dictionary[freq]
+
+    # Dividing with the period:
+    # For example if I have a 2M frequency:
+    # Then instead of 12 months we have 6 examina
+    numeric_freq = int(freq_dictionary[freq] / period)
+
+    return numeric_freq
