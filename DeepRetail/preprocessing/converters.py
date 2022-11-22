@@ -56,7 +56,7 @@ def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
     return pivot_df
 
 
-def transaction_df(df, keep_zeros=False):
+def transaction_df(df, drop_zeros=False):
     """Converts a pivoted df to a transaction df. A transaction df has 3 columns:
         - unique_id: Sales location of each time series.
         - date: The date
@@ -76,7 +76,7 @@ def transaction_df(df, keep_zeros=False):
     trans_df = pd.melt(trans_df, id_vars="unique_id", value_name="y", var_name="date")
 
     # Filters zeros if keep_zeros is set to True
-    if keep_zeros:
+    if drop_zeros:
         trans_df = trans_df[trans_df["y"] != 0]
 
     return trans_df

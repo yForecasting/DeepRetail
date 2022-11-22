@@ -100,7 +100,7 @@ class StatisticalForecaster(object):
             )
 
         # convert to the right format
-        fc_df = transaction_df(fc_df, keep_zeros=False)
+        fc_df = transaction_df(fc_df, drop_zeros=False)
 
         if total_to_forecast != "all":
             # Take an ordered sample
