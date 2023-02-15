@@ -18,7 +18,8 @@ def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
         pd.DataFrame: A pivoted DataFrame.
 
     Examples:
-        >>> df = pd.DataFrame({'date': ['2022-01-01', '2022-01-02', '2022-01-03', '2022-01-01', '2022-01-02', '2022-01-03'],
+        >>> df = pd.DataFrame({'date': ['2022-01-01', '2022-01-02', '2022-01-03', '2022-01-01', '2022-01-02',
+                            '2022-01-03'],
         ...                    'y': [1, 2, 3, 4, 5, 6],
         ...                    'unique_id': ['A', 'A', 'A', 'B', 'B', 'B']})
         >>> pivoted_df(df, 'D', 'sum')
@@ -72,7 +73,8 @@ def transaction_df(df, drop_zeros=False):
         pd.DataFrame: A transaction DataFrame.
 
     Examples:
-        >>> df = pd.DataFrame({'unique_id': ['A', 'A', 'B', 'B'], '2022-01-01': [1, 2, 0, 4], '2022-01-02': [0, 5, 6, 0]})
+        >>> df = pd.DataFrame({'unique_id': ['A', 'A', 'B', 'B'], '2022-01-01': [1, 2, 0, 4],
+                '2022-01-02': [0, 5, 6, 0]})
         >>> transaction_df(df)
         unique_id        date  y
         0         A  2022-01-01  1
