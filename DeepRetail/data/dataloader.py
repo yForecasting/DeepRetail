@@ -1,6 +1,5 @@
 import pandas as pd
 from DeepRetail.transformations.formats import transaction_df
-from DeepRetail.data.casereaders import read_case_0
 
 
 class Reader(object):
@@ -60,11 +59,7 @@ class Reader(object):
         """
         # Call an individual reading function for every case
         if self.case == 0:
-            # for case 3 -> read the data (we require the calendar data here)
-            if self.calendar_filepath is None:
-                raise ValueError("Case 0 requires the calendar dataframe")
-            # read
-            temp_df = read_case_0(self.filepath, self.calendar_filepath)
+            temp_df = ...
 
         # filter negatives
         if filter_negatives:
