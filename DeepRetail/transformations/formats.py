@@ -96,3 +96,38 @@ def transaction_df(df, drop_zeros=False):
         trans_df = trans_df[trans_df["y"] != 0]
 
     return trans_df
+
+
+def sktime_forecast_format(df, format="transaction"):
+    """Converts a dataframe to the format required by sktime for forecasting.
+
+    Args:
+        df (pd.DataFrame): The dataframe in either pivot or transcation format
+        format (str, optional): The format. Defaults to 'transaction'. Options: 'transaction', 'pivot'.
+
+    Returns:
+        pd.DataFrame: The converted dataframe.
+    """
+
+    # if we have the transaction format
+    if format == "transaction":
+        # rename and pivot
+        df = df.rename(columns={"date": "Period"})
+        df = pd.pivot_table(
+            df,
+            index="Period",
+            columns="unique_id",
+            values="y",
+            aggfunc="first",
+        )
+
+        # Drop the name on the columns
+        df.columns.name = None
+    else:
+        # Droping the name of the index
+        df.index.name = None
+
+        # Transpose and rename
+        df.T.rename_axis("Period").head()
+
+    return df
