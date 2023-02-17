@@ -7,6 +7,8 @@ from sktime.forecasting.model_selection import (
     temporal_train_test_split,
 )
 from sktime.forecasting.ets import AutoETS
+from sktime.forecasting.naive import NaiveForecaster
+from sktime.forecasting.statsforecast import StatsForecastAutoARIMA
 import warnings
 
 
@@ -17,7 +19,8 @@ class StatisticalForecaster(object):
 
     Parameters:
         models : list
-            A list of model names to use for forecasting. Currently only 'ETS' is supported.
+            A list of model names to use for forecasting.
+            Currently only 'Naive', 'SNaive', 'ARIMA' and 'ETS' are supported.
         freq : str
             The frequency of the time series data.
         n_jobs : int, optional (default=-1)
@@ -106,6 +109,21 @@ class StatisticalForecaster(object):
         # Add the models and their names
         models_to_fit = []
         model_names = []
+
+        # Append to the list
+        if "Naive" in models:
+            models_to_fit.append(NaiveForecaster(strategy="last"))
+            model_names.append("Naive")
+        if "SNaive" in models:
+            models_to_fit.append(
+                NaiveForecaster(strategy="last", sp=self.seasonal_length)
+            )
+            model_names.append("Seasonal Naive")
+        if "ARIMA" in models:
+            models_to_fit.append(
+                StatsForecastAutoARIMA(sp=self.seasonal_length, n_jobs=self.n_jobs)
+            )
+            model_names.append("ARIMA")
         if "ETS" in models:
             models_to_fit.append(
                 AutoETS(auto=True, sp=self.seasonal_length, n_jobs=self.n_jobs)
