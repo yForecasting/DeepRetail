@@ -109,7 +109,7 @@ def sktime_forecast_format(df, format="transaction"):
         pd.DataFrame: The converted dataframe.
     """
 
-    # if we have the transaction format
+    # if we  have the transaction format
     if format == "transaction":
         # rename and pivot
         df = df.rename(columns={"date": "Period"})
@@ -128,6 +128,7 @@ def sktime_forecast_format(df, format="transaction"):
         df.index.name = None
 
         # Transpose and rename
-        df.T.rename_axis("Period").head()
+        df = df.T
+        df.index.names = ['Period']
 
     return df
