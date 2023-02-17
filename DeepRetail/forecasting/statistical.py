@@ -425,7 +425,7 @@ class StatisticalForecaster(object):
         gray_scale = 0.9
 
         for idx in range(n):
-            fig = plt.figure(figsize=(20, 10), constrained_layout=True)
+            fig = plt.figure(figsize=(16, 8), constrained_layout=True)
             gs = GridSpec(2, 2, figure=fig)
 
             y = vals[idx]
