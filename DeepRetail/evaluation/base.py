@@ -58,6 +58,9 @@ class Evaluator(object):
         plot_error_distribution(self, metric, group_scores_by=["unique_id", "Model", "fh", "cv"]):
             Plots the distribution of errors for the specified metric.
 
+        plot_model_summary(self, metrics, type, group_scores_by=["unique_id", "Model", "fh", "cv"], fliers=True):
+            Plots summary error plots per model. Supports two types of options, line plot and box plot.
+
 
     Examples:
         >>> from DeepRetail.evaluation import Evaluator
@@ -77,6 +80,11 @@ class Evaluator(object):
 
         # Calculate the evaluation metrics
         >>> evaluation_df = evaluator.evaluate(metrics, group_scores_by)
+
+        # Some visualization:
+        >>> evaluator.plot_error_distribution()
+        >>> evaluator.plot_model_summary(metrics = metrics, type = 'line')
+        >>> evaluator.plot_model_summary(metrics = metrics, type = 'boxplot')
 
         """
 
@@ -202,6 +210,19 @@ class Evaluator(object):
             plot_single_hist_boxplot(temp_df, metric_names, model)
 
     def plot_model_summary(self, metrics, type, group_scores_by=["unique_id", "Model", "fh", "cv"], fliers=True):
+        """
+        Plots summary error plots per model. Supports two types of options, line plot and box plot.
+
+        Args:
+            metrics: A list of metrics to be calculated for each group.
+                Metrics should be included in DeepRetail.evaluation.metrics.
+            type: The type of plot create.
+                Supports "line" and "boxplot"
+            group_scores_by: The grouping for the evaluation.
+                Used only on the boxplot. Line plot uses specific grouping.
+                Default and recommended is the total evaluation.
+            fliers: Wheater to include fliers or not on the boxplot.
+        """
 
         if type == 'boxplot':
             # Evalute on the given metrics
