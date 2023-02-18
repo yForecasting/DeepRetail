@@ -1,5 +1,6 @@
 from DeepRetail.transformations.formats import transaction_df, pivoted_df
-from DeepRetail.evaluation.metrics import mse, mae
+from DeepRetail.evaluation.metrics import mse, mae, rmsse, scaled_error
+from DeepRetail.visuals.evaluation import plot_single_hist_boxplot
 import pandas as pd
 
 
@@ -53,6 +54,9 @@ class Evaluator(object):
 
         evaluate(self, metrics, group_scores_by=["unique_id", "Model", "fh", "cv"]):
             Evaluates the predictions and calculates the specified metrics for each group.
+
+        plot_error_distribution(self, metric, group_scores_by=["unique_id", "Model", "fh", "cv"]):
+            Plots the distribution of errors for the specified metric.
 
 
     Examples:
@@ -164,3 +168,35 @@ class Evaluator(object):
         self.evaluated_metrics = metrics
 
         return self.evaluation_df
+
+    def plot_error_distribution(self, metrics=[rmsse, scaled_error]):
+        """
+        Plots the error distribution for the given metrics.
+            Default and recomeneded metrics are rmsse and scaled_error.
+
+        Args:
+            metrics (list): A list of metrics to be calculated for each group.
+                Metrics should be included in DeepRetail.evaluation.metrics.
+                The default value is [rmsse, scaled_error].
+
+        """
+
+        # Assert that self.evaluation has been called and that the metrics are included
+        if self.evaluation_df is None:
+            self.evaluate(metrics)
+        # Check if metrics are included
+        elif not all(metric in self.evaluated_metrics for metric in metrics):
+            self.evaluate(metrics)
+
+        # Take the name of the metrics
+        metric_names = [metric.__name__ for metric in metrics]
+
+        # take the models
+        models = self.evaluation_df['Model'].unique()
+
+        # Plots for every model
+        for model in models:
+            # Filter by the model
+            temp_df = self.evaluation_df[self.evaluation_df['Model'] == model]
+            # Plot
+            plot_single_hist_boxplot(temp_df, metric_names, model)
