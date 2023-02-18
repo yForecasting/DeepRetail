@@ -1,6 +1,6 @@
 from DeepRetail.transformations.formats import transaction_df, pivoted_df
 from DeepRetail.evaluation.metrics import mse, mae, rmsse, scaled_error
-from DeepRetail.visuals.evaluation import plot_single_hist_boxplot
+from DeepRetail.visuals.evaluation import plot_single_hist_boxplot, plot_box, plot_line
 import pandas as pd
 
 
@@ -200,3 +200,21 @@ class Evaluator(object):
             temp_df = evaluation_df[evaluation_df['Model'] == model]
             # Plot
             plot_single_hist_boxplot(temp_df, metric_names, model)
+
+    def plot_model_summary(self, metrics, type, group_scores_by=["unique_id", "Model", "fh", "cv"], fliers=True):
+
+        if type == 'boxplot':
+            # Evalute on the given metrics
+            evaluation_df = self.evaluate(metrics, group_scores_by)
+            # plot
+            plot_box(evaluation_df, metrics, fliers=True)
+
+        elif type == 'line':
+            # Not allowing for grouping selection.
+            grouping = ['Model', 'unique_id', 'fh']
+            evaluation_df = self.evaluate(metrics=metrics, group_scores_by=grouping)
+            # plot
+            plot_line(evaluation_df, metrics=metrics)
+
+        else:
+            raise ValueError('Currently supporting only boxplot and line plots')
