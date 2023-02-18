@@ -120,3 +120,68 @@ def plot_box(evaluation_df, metrics, fliers=True):
 
     # plt.tight_layout()
     plt.show()
+
+
+def plot_line(evaluation_df, metrics):
+    """
+    Plots lineplots for every metric. Axis x containts the forecast horizon and y the given metric.
+    A line is drawn for every model.
+    The dataframe should be grouped as: ['unique_id', 'Model', 'fh']
+
+    Args:
+        evaluation_df (pd.DataFrame): An evaluation dataframe from the Evaluate object.
+        metrics (list): The metrics to consider.
+
+    """
+
+    # Initialize
+    # Initialize
+    total_mets = len(metrics)
+    # get the metrics names
+    metric_names = [metric.__name__ for metric in metrics]
+    gray_scale = 0.9
+
+    # define columns
+    cols = total_mets if total_mets < 3 else 3
+    rows = total_mets // cols
+
+    # ad-hoc correction for specific cases
+    if total_mets % cols != 0:
+        rows += 1
+
+    fig, axes = plt.subplots(rows, cols, figsize=(20, 8))
+    flat_axes = axes.flatten()[:total_mets]
+
+    for i, ax in enumerate(flat_axes):
+
+        # Define the current metric
+        met = metric_names[i]
+
+        # build the graph
+        # Keep relevant columns
+        temp_df = evaluation_df[["unique_id", "Model", "fh", met]]
+
+        # Groupby per fh
+        temp_df = temp_df.groupby(["Model", "fh"]).agg({met: np.mean}).reset_index()
+
+        # Pivot
+        temp_df = pd.pivot_table(
+            temp_df, index="Model", columns="fh", values=met, aggfunc="first"
+        )
+
+        # Plot
+        temp_df.T.plot(marker="o", title=met, ax=ax)
+
+        ax.set_xlabel(None)
+        ax.set_facecolor((gray_scale, gray_scale, gray_scale))
+        ax.set_title(met)
+        ax.set_xticks(np.arange(1, temp_df.shape[1] + 1, 1))
+        ax.grid()
+
+    to_drop = np.arange(total_mets, len(axes.flatten()))
+    for drop in to_drop:
+        drop = drop % 3
+        fig.delaxes(axes[rows - 1][drop])
+
+    # plt.tight_layout()
+    plt.show()
