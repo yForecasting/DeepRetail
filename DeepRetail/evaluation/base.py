@@ -160,4 +160,7 @@ class Evaluator(object):
             )
         ).reset_index()
 
+        # add the metrics to the object
+        self.evaluated_metrics = metrics
+
         return self.evaluation_df
