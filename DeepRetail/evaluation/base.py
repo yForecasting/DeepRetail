@@ -158,16 +158,18 @@ class Evaluator(object):
         )
 
         # estimate the scores
-        self.evaluation_df = pd.DataFrame(
+        evaluation_df = pd.DataFrame(
             merged_result_df.groupby(group_scores_by).apply(
                 calculate_group_scores, metrics=metrics
             )
         ).reset_index()
 
         # add the metrics to the object
-        self.evaluated_metrics = metrics
-
-        return self.evaluation_df
+        # self.evaluated_metrics = metrics
+        # self.evaluate_df = evaluation_df
+        # return self.evaluation_df
+        
+        return evaluation_df
 
     def plot_error_distribution(self, metrics=[rmsse, scaled_error]):
         """
