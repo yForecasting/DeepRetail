@@ -168,10 +168,10 @@ class Evaluator(object):
         # self.evaluated_metrics = metrics
         # self.evaluate_df = evaluation_df
         # return self.evaluation_df
-        
+
         return evaluation_df
 
-    def plot_error_distribution(self, metrics=[rmsse, scaled_error]):
+    def plot_error_distribution(self, metrics=[rmsse, scaled_error], group_scores_by=["unique_id", "Model", "fh", "cv"]):
         """
         Plots the error distribution for the given metrics.
             Default and recomeneded metrics are rmsse and scaled_error.
@@ -180,25 +180,23 @@ class Evaluator(object):
             metrics (list): A list of metrics to be calculated for each group.
                 Metrics should be included in DeepRetail.evaluation.metrics.
                 The default value is [rmsse, scaled_error].
+            group_scores_by (list): A list of columns to group the predictions by.
+                The default value groups by unique_id, Model, fh, and cv.
 
         """
 
-        # Assert that self.evaluation has been called and that the metrics are included
-        if self.evaluation_df is None:
-            self.evaluate(metrics)
-        # Check if metrics are included
-        elif not all(metric in self.evaluated_metrics for metric in metrics):
-            self.evaluate(metrics)
+        # Evaluate on the given metrics
+        evaluation_df = self.evaluate(metrics, group_scores_by)
 
         # Take the name of the metrics
         metric_names = [metric.__name__ for metric in metrics]
 
         # take the models
-        models = self.evaluation_df['Model'].unique()
+        models = evaluation_df['Model'].unique()
 
         # Plots for every model
         for model in models:
             # Filter by the model
-            temp_df = self.evaluation_df[self.evaluation_df['Model'] == model]
+            temp_df = evaluation_df[evaluation_df['Model'] == model]
             # Plot
             plot_single_hist_boxplot(temp_df, metric_names, model)
