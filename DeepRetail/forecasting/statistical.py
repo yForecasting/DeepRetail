@@ -203,7 +203,7 @@ class StatisticalForecaster(object):
             self.y_test = pd.melt(
                 self.y_test.reset_index(),
                 id_vars=["Period"],
-                value_vars=self.y_test.columns[1:],
+                value_vars=self.y_test.columns,
                 value_name="True",
                 var_name="unique_id",
             ).rename(columns={"Period": "date"})
