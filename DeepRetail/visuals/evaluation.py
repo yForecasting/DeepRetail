@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 def plot_single_hist_boxplot(eval_df_temp, metrics, model):
@@ -67,4 +68,55 @@ def plot_single_hist_boxplot(eval_df_temp, metrics, model):
         ax.set_facecolor((gray_scale, gray_scale, gray_scale))
 
     # Show plot
+    plt.show()
+
+
+def plot_box(evaluation_df, metrics, fliers=True):
+    """
+    Plots boxplots for every model for the provide metrics.
+
+    Args:
+        evaluation_df (pd.DataFrame): An evaluation dataframe from the Evaluate object.
+        metrics (list): The metrics to consider.
+        fliers (bool): Whether to show the outliers or not.
+    """
+
+    # Initialize
+    total_mets = len(metrics)
+    # get the metrics names
+    metric_names = [metric.__name__ for metric in metrics]
+    gray_scale = 0.9
+
+    # define columns
+    cols = total_mets if total_mets < 3 else 3
+    rows = total_mets // cols
+
+    # ad-hoc correction for specific cases
+    if total_mets % cols != 0:
+        rows += 1
+
+    plt.figure(figsize=(14, 8))
+    for i, met in enumerate(metric_names, start=1):
+
+        # Define subplot
+        plt.subplot(rows, cols, i)
+
+        # build the graph
+
+        # Keep relevant columns
+        temp_df = evaluation_df[["unique_id", "Model", met]]
+
+        # Pivot to get the right format for the box plot
+        temp_df = pd.pivot_table(
+            temp_df, index="unique_id", columns="Model", values=met, aggfunc="first"
+        )
+
+        ax = temp_df.boxplot(
+            color="black", meanline=True, showbox=True, showfliers=fliers
+        )
+        ax.set_facecolor((gray_scale, gray_scale, gray_scale))
+        ax.set_title(met)
+        ax.grid()
+
+    # plt.tight_layout()
     plt.show()
