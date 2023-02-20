@@ -86,7 +86,7 @@ class StatisticalForecaster(object):
 
     """
 
-    def __init__(self, models, freq, n_jobs=-1, warning=False):
+    def __init__(self, models, freq, n_jobs=-1, warning=False, seasonal_length=None):
         """
         Initialize the StatisticalForecaster object.
 
@@ -99,10 +99,17 @@ class StatisticalForecaster(object):
                 The number of jobs to run in parallel for the fitting process.
             warning: bool, default=False
                 Whether to show warnings or not.
+            seasonal_length: int, default=None
+                The length of the seasonal pattern.
+                If None, the seasonal length is inferred from the frequency.
+                On frequencies with multiple seasonal patterns, the first seasonal pattern is used.
 
         """
         self.freq = freq
-        self.seasonal_length = get_numeric_frequency(freq)
+        if seasonal_length is not None:
+            self.seasonal_length = seasonal_length
+        else:
+            self.seasonal_length = get_numeric_frequency(freq)
         self.n_jobs = n_jobs
 
         # Set the warnings
