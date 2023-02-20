@@ -110,6 +110,10 @@ class StatisticalForecaster(object):
             self.seasonal_length = seasonal_length
         else:
             self.seasonal_length = get_numeric_frequency(freq)
+            # Check if it returns multiple seasonal lengths
+            if isinstance(self.seasonal_length, list):
+                # take the first
+                self.seasonal_length = self.seasonal_length[0]
         self.n_jobs = n_jobs
 
         # Set the warnings
