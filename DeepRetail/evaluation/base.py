@@ -1,6 +1,11 @@
 from DeepRetail.transformations.formats import transaction_df, pivoted_df
 from DeepRetail.evaluation.metrics import mse, mae, rmsse, scaled_error
-from DeepRetail.visuals.evaluation import visualize_forecasts, plot_single_hist_boxplot, plot_box, plot_line
+from DeepRetail.visuals.evaluation import (
+    visualize_forecasts,
+    plot_single_hist_boxplot,
+    plot_box,
+    plot_line,
+)
 import pandas as pd
 
 
@@ -89,7 +94,7 @@ class Evaluator(object):
         >>> evaluator.plot_model_summary(metrics = metrics, type = 'boxplot')
         >>> evaluator.plot_forecasts(n=10, models='all', show_in_sample=True)
 
-        """
+    """
 
     def __init__(self, original_df, result_df, freq, format="pivoted"):
         """
@@ -182,7 +187,11 @@ class Evaluator(object):
 
         return evaluation_df
 
-    def plot_error_distribution(self, metrics=[rmsse, scaled_error], group_scores_by=["unique_id", "Model", "fh", "cv"]):
+    def plot_error_distribution(
+        self,
+        metrics=[rmsse, scaled_error],
+        group_scores_by=["unique_id", "Model", "fh", "cv"],
+    ):
         """
         Plots the error distribution for the given metrics.
             Default and recomeneded metrics are rmsse and scaled_error.
@@ -203,16 +212,22 @@ class Evaluator(object):
         metric_names = [metric.__name__ for metric in metrics]
 
         # take the models
-        models = evaluation_df['Model'].unique()
+        models = evaluation_df["Model"].unique()
 
         # Plots for every model
         for model in models:
             # Filter by the model
-            temp_df = evaluation_df[evaluation_df['Model'] == model]
+            temp_df = evaluation_df[evaluation_df["Model"] == model]
             # Plot
             plot_single_hist_boxplot(temp_df, metric_names, model)
 
-    def plot_model_summary(self, metrics, type, group_scores_by=["unique_id", "Model", "fh", "cv"], fliers=True):
+    def plot_model_summary(
+        self,
+        metrics,
+        type,
+        group_scores_by=["unique_id", "Model", "fh", "cv"],
+        fliers=True,
+    ):
         """
         Plots summary error plots per model. Supports two types of options, line plot and box plot.
 
@@ -227,23 +242,23 @@ class Evaluator(object):
             fliers: Wheater to include fliers or not on the boxplot.
         """
 
-        if type == 'boxplot':
+        if type == "boxplot":
             # Evalute on the given metrics
             evaluation_df = self.evaluate(metrics, group_scores_by)
             # plot
             plot_box(evaluation_df, metrics, fliers=True)
 
-        elif type == 'line':
+        elif type == "line":
             # Not allowing for grouping selection.
-            grouping = ['Model', 'unique_id', 'fh']
+            grouping = ["Model", "unique_id", "fh"]
             evaluation_df = self.evaluate(metrics=metrics, group_scores_by=grouping)
             # plot
             plot_line(evaluation_df, metrics=metrics)
 
         else:
-            raise ValueError('Currently supporting only boxplot and line plots')
+            raise ValueError("Currently supporting only boxplot and line plots")
 
-    def plot_forecasts(self, n, models='all', show_in_sample=True):
+    def plot_forecasts(self, n, models="all", show_in_sample=True):
         """
         Plots the forecasts for the given models.
 
@@ -256,11 +271,19 @@ class Evaluator(object):
             group_scores_by (list): A list of columns to group the predictions by.
         """
 
-        if models == 'all':
-            models = self.result_df['Model'].unique()
+        if models == "all":
+            models = self.result_df["Model"].unique()
 
         # convert the original df to pivote format
         temp_df = pivoted_df(self.original_df, self.freq)
-        
-        visualize_forecasts(n, self.total_fh, self.total_cv, self.freq, temp_df, self.result_df, models=models, show_in_sample=show_in_sample)
-        
+
+        visualize_forecasts(
+            n,
+            self.total_fh,
+            self.total_cv,
+            self.freq,
+            temp_df,
+            self.result_df,
+            models=models,
+            show_in_sample=show_in_sample,
+        )
