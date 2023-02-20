@@ -255,6 +255,8 @@ def visualize_forecasts(n, h, cv, freq, original_df, forecast_df, models, show_i
                     temp_vals.plot(ax=ax, label=model)
 
                 else:
+                    # Convert to series
+                    temp_vals = pd.Series(temp_vals, index=dates[-h:])
                     # plot without the mask
                     temp_vals.plot(ax=ax, label=model)
 
