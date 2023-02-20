@@ -1,6 +1,6 @@
 from DeepRetail.transformations.formats import transaction_df, pivoted_df
 from DeepRetail.evaluation.metrics import mse, mae, rmsse, scaled_error
-from DeepRetail.visuals.evaluation import plot_single_hist_boxplot, plot_box, plot_line
+from DeepRetail.visuals.evaluation import visualize_forecasts, plot_single_hist_boxplot, plot_box, plot_line
 import pandas as pd
 
 
@@ -60,6 +60,8 @@ class Evaluator(object):
 
         plot_model_summary(self, metrics, type, group_scores_by=["unique_id", "Model", "fh", "cv"], fliers=True):
             Plots summary error plots per model. Supports two types of options, line plot and box plot.
+        plot_forecasts(self, n, models='all', show_in_sample=True):
+            Plots a number of forecasts for the defined models
 
 
     Examples:
@@ -85,6 +87,7 @@ class Evaluator(object):
         >>> evaluator.plot_error_distribution()
         >>> evaluator.plot_model_summary(metrics = metrics, type = 'line')
         >>> evaluator.plot_model_summary(metrics = metrics, type = 'boxplot')
+        >>> evaluator.plot_forecasts(n=10, models='all', show_in_sample=True)
 
         """
 
@@ -239,3 +242,25 @@ class Evaluator(object):
 
         else:
             raise ValueError('Currently supporting only boxplot and line plots')
+
+    def plot_forecasts(self, n, models='all', show_in_sample=True):
+        """
+        Plots the forecasts for the given models.
+
+        Args:
+            n (int): The number of samples to plot.
+            models (list): A list of models to plot.
+                        Default is 'all' which plots all models.
+            show_in_sample (bool): Wheater to show the in-sample data or not.
+                        Default is True.
+            group_scores_by (list): A list of columns to group the predictions by.
+        """
+
+        if models == 'all':
+            models = self.result_df['Model'].unique()
+
+        # convert the original df to pivote format
+        temp_df = pivoted_df(self.original_df, self.freq)
+        
+        visualize_forecasts(n, self.total_fh, self.total_cv, self.freq, temp_df, self.result_df, models=models, show_in_sample=show_in_sample)
+        
