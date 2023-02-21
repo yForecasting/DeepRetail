@@ -204,8 +204,11 @@ class StatisticalForecaster(object):
         if not holdout and cv > 1:
             raise ValueError("Cannot do cross validation without holdout.")
 
+        # Add to the object
         self.fh = np.arange(1, h + 1, 1)
         self.cv = cv
+        self.h = h
+        self.holdout = holdout
 
         if holdout:
             self.y_train, self.y_test = temporal_train_test_split(
