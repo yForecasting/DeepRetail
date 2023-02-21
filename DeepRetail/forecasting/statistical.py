@@ -319,18 +319,28 @@ class StatisticalForecaster(object):
         """
 
         # add the number of cv and fh
-        cv_vals = sorted(self.forecast_df["cutoff"].unique())
-        fh_vals = sorted(self.forecast_df["date"].unique())
+        if self.holdout:
+            cv_vals = sorted(self.forecast_df["cutoff"].unique())
+            fh_vals = sorted(self.forecast_df["date"].unique())
 
-        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
-        fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
+            cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+            fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
 
-        self.forecast_df["fh"] = [
-            fh_dict[date] for date in self.forecast_df["date"].values
-        ]
-        self.forecast_df["cv"] = [
-            cv_dict[date] for date in self.forecast_df["cutoff"].values
-        ]
+            self.forecast_df["fh"] = [
+                fh_dict[date] for date in self.forecast_df["date"].values
+            ]
+            self.forecast_df["cv"] = [
+                cv_dict[date] for date in self.forecast_df["cutoff"].values
+            ]
+        else:
+            # get the forecasted dates
+            dates = self.forecast_df["date"].unique()
+            # get a dictionary of dates and their corresponding fh
+            fh_dict = dict(zip(dates, np.arange(1, len(dates) + 1)))
+            # add the fh
+            self.forecast_df["fh"] = [fh_dict[date] for date in self.forecast_df["date"].values]
+            # also add the cv
+            self.forecast_df['cv'] = None
 
     def get_residuals(self):
         """
