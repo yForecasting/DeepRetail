@@ -269,24 +269,39 @@ class StatisticalForecaster(object):
         model.fit(self.y_train)
 
         # get the prediction
-        y_pred = model.update_predict(self.fc_df, self.cross_validator)
+        if self.holdout:
+            # fit the model
+            y_pred = model.update_predict(self.fc_df, self.cross_validator)
+            # Convert to the right format
+            if self.h > 1:
+                y_pred = (
+                    y_pred.unstack()
+                    .unstack(level=1)
+                    .reset_index()
+                    .rename(columns={"level_0": "cutoff", "Period": "date"})
+                )
+                # Collapse
+                y_pred = pd.melt(
+                    y_pred,
+                    id_vars=["date", "cutoff"],
+                    value_vars=y_pred.columns[2:],
+                    value_name="y",
+                    var_name="unique_id",
+                )
+        else:
+            # fit the model
+            y_pred = model.predict(fh=self.fh)
+            # Convert to the right format
+            y_pred = (
+                y_pred.unstack()
+                .reset_index()
+                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y"})
+            )
+            # Add the last day as cutoff
+            y_pred["cutoff"] = self.fc_df.index.max()
 
-        # Convert to the right format
-        y_pred = (
-            y_pred.unstack()
-            .unstack(level=1)
-            .reset_index()
-            .rename(columns={"level_0": "cutoff", "Period": "date"})
-        )
-
-        # Collapse
-        y_pred = pd.melt(
-            y_pred,
-            id_vars=["date", "cutoff"],
-            value_vars=y_pred.columns[2:],
-            value_name="y",
-            var_name="unique_id",
-        )
+        # add the model name
+        y_pred["Model"] = name
 
         # add the model name
         y_pred["Model"] = name
