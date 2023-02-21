@@ -175,7 +175,8 @@ class StatisticalForecaster(object):
         fc_df = sktime_forecast_format(fc_df)
 
         # Fix an issue with frequencies
-        fc_df = fc_df.asfreq(self.freq)
+        # turned off -> pay attention if it is needed
+        # fc_df = fc_df.asfreq(self.freq)
 
         # Add to the object
         self.fc_df = fc_df
