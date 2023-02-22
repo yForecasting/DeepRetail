@@ -176,10 +176,11 @@ class StatisticalForecaster(object):
 
         # Fix an issue with frequencies
         # turned off -> pay attention if it is needed
+        # -> moved it to the predict method
         # fc_df = fc_df.asfreq(self.freq)
 
-        # Add to the object -> moved it to the predict method
-        # self.fc_df = fc_df
+        # Add to the object
+        self.fc_df = fc_df
 
     def predict(self, h, cv=1, holdout=True):
         """
