@@ -208,3 +208,31 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
     resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
 
     return resample_df
+
+
+def split_reconciled(out, frequencies):
+    """
+    Split the `out` list into a list of sublists.
+    Sublists contain the specified number of elements determined by the corresponding element in the `frequencies` list.
+
+    Args:
+    - out (List[Any]): The list to split into sublists.
+    - frequencies (List[int]): A list of integers representing the number of elements in each sublist.
+            The length of this list determines the number of sublists that will be returned.
+
+    Returns:
+    - List[List[Any]]: A list of sublists of `out`,
+    """
+    splits = []  # Initialize an empty list to store the sublists
+
+    for i, frequency in enumerate(frequencies):
+        # Calculate the start and end indices for the current sublist
+        start = sum(frequencies[:i])
+        end = start + frequency
+        # Extract the current sublist from `out` and append it to the `splits` list
+        split = out[start:end]
+        splits.append(split)
+
+    return splits
+
+
