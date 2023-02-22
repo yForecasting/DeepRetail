@@ -3,6 +3,7 @@ from DeepRetail.reconciliation.utils import (
     get_factors,
     compute_resampled_frequencies,
     compute_matrix_S,
+    resample_temporal_level,
 )
 import numpy as np
 
@@ -49,3 +50,21 @@ class THieF(object):
 
         # Construct the Smat
         self.Smat = compute_matrix_S(self.factors)
+
+    def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
+        # In this method I build the hierarchy
+        # I need to see how I will use the holdout and the cv paremeter
+
+        self.original_df = original_df
+        self.holdout = holdout
+
+        # Get the list of the resampled dataframes
+        resampled_dfs = [
+            resample_temporal_level(self.original_df, i, self.bottom_freq, j)
+            for i, j in zip(self.factors, self.resampled_factors)
+        ]
+
+        # convert it to a dictionary with the factors as keys
+        self.resampled_dfs = {
+            self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
+        }
