@@ -178,8 +178,8 @@ class StatisticalForecaster(object):
         # turned off -> pay attention if it is needed
         # fc_df = fc_df.asfreq(self.freq)
 
-        # Add to the object
-        self.fc_df = fc_df
+        # Add to the object -> moved it to the predict method
+        # self.fc_df = fc_df
 
     def predict(self, h, cv=1, holdout=True):
         """
@@ -213,6 +213,9 @@ class StatisticalForecaster(object):
         total_test_size = h + cv - 1
 
         if holdout:
+            # add the frequency to the index for shifting
+            self.fc_df = self.fc_df.asfreq(self.freq)
+
             self.y_train, self.y_test = temporal_train_test_split(
                 self.fc_df, test_size=total_test_size
             )
