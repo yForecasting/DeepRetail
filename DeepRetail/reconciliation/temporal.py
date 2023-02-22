@@ -11,8 +11,33 @@ import pandas as pd
 
 
 class TemporalReconciler(object):
-    def __init__(self):
-        pass
+    def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+        # Ensure that either factors or bottom_freq is given
+        # Raise an error otherwise
+        if factors is None and bottom_level_freq is None:
+            raise TypeError("Either factors or bottom_freq should be given")
+
+        # Get the numeric frequency
+        self.bottom_level_freq = bottom_level_freq
+        self.bottom_level_numeric_freq = get_numeric_frequency(self.bottom_level_freq)
+
+        # Construct all factors if they are not given
+        if factors is None:
+            factors = get_factors(self.bottom_level_numeric_freq)
+            self.factors = factors
+        else:
+            self.factors = factors
+
+        # Initialize extra parameters
+        # Build the forecast horizons
+        self.fhs = np.flip(factors) * top_fh
+        self.frequencies = self.fhs.copy()
+        self.m = np.flip(self.frequencies)
+        self.max_freq = max(self.frequencies)
+        self.total_levels = len(self.factors)
+
+        # Construct the Smat
+        self.Smat = compute_matrix_S(self.factors)
 
 
 class THieF(object):
