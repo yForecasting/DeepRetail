@@ -115,3 +115,24 @@ def convert_offset_to_lower_freq(offset):
         new_freq = offset
 
     return new_freq
+
+
+def compute_resampled_frequencies(factors, bottom_freq):
+    """
+    Computes the resampled frequencies. It also converts to a lower equivelant frequency
+    For example 12M to 1Y, 7D to 1W, 24H to 1D
+
+    Args:
+        factors (list): a list of factors for the temporal levels
+
+    Returns:
+        resample_factors (list): a list of resampled frequencies
+    """
+
+    # Converts to pandas frequencies
+    resample_factors = [str(i) + bottom_freq for i in factors]
+
+    # Converts to lower frequencies
+    resample_factors = [convert_offset_to_lower_freq(i) for i in resample_factors]
+
+    return resample_factors
