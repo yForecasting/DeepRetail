@@ -256,3 +256,21 @@ def reverse_order(out, frequencies):
 
     # Flatten the list of sublists into a single list and return it
     return [x for sublist in flip for x in sublist]
+
+
+def get_w_matrix_structural(frequencies):
+    # computes the reconciliation matrix for structural scalling
+
+    # Get the factors
+    m = np.flip(frequencies)
+
+    # Get nsum
+    nsum = np.flip(np.repeat(m, frequencies))
+
+    # Get the weights
+    weights = [1 / weight for weight in nsum]
+
+    # Then convert to diagonal
+    W_inv = np.diag(weights)
+
+    return W_inv
