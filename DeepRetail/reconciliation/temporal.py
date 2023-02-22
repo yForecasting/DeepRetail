@@ -5,6 +5,9 @@ from DeepRetail.reconciliation.utils import (
     compute_resampled_frequencies,
     compute_matrix_S,
     resample_temporal_level,
+    reverse_order,
+    get_w_matrix_structural,
+    compute_y_tilde,
 )
 import numpy as np
 import pandas as pd
@@ -38,6 +41,139 @@ class TemporalReconciler(object):
 
         # Construct the Smat
         self.Smat = compute_matrix_S(self.factors)
+
+    def get_reconciliation_format(self):
+        # Converts to the format for reconciliation
+
+        temp_df = self.base_fc_df.copy()
+
+        # Add the temporal indexer to identify temporal levels
+        temp_df["temp_indexer"] = (
+            temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
+        )
+
+        # Add the model to the unique_id
+        temp_df["unique_id_model"] = temp_df["unique_id"] + "-" + temp_df["Model"]
+
+        # Pivot
+        temp_df = pd.pivot_table(
+            temp_df,
+            index="unique_id_model",
+            columns="temp_indexer",
+            values="y",
+            aggfunc="first",
+        )
+
+        # Should have another option for when we have cv too.
+
+        # order the columns
+        cols = temp_df.columns.tolist()
+        # first should be the column with the highest value before the _ and the lowest after the _
+        cols.sort(key=lambda x: (int(x.split("_")[0]), int(x.split("_")[1])))
+        # reverse the order
+        cols = reverse_order(cols, self.frequencies)
+        # add the new order
+        temp_df = temp_df[cols]
+
+        return temp_df
+
+    def compute_matrix_W(self, reconciliation_method):
+        # Computes the matrix W
+
+        # For structural scalling
+        if reconciliation_method == "struc":
+            Wmat = get_w_matrix_structural(self.frequencies)
+
+        elif reconciliation_method == "mse":
+            ...
+
+        elif reconciliation_method == "variance":
+            ...
+
+        else:
+            raise ValueError("Reconciliation method not supported")
+
+        return Wmat
+
+    def get_reconciled_predictions(self):
+        # function to get the reconciliated predictions for every value on the df
+
+        # First extract values from the dataframe
+        values = self.reconciliation_ready_df.values
+        ids = self.reconciliation_ready_df.index
+        cols = self.reconciliation_ready_df.columns
+
+        # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
+        reconciled_values = [compute_y_tilde(y, self.Smat, self.Wmat) for y in values]
+
+        # Convert to dataframe
+        reconcilded_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
+
+        return reconcilded_df
+
+    def reverse_reconciliation_format(self, reco_method):
+        # Function to reverse the reconciliation format to the original one
+
+        temp_df = self.base_fc_df.copy()
+        reco_df = self.reconciled_df
+
+        # Prepare the base forecasts
+        # Get the temp indexer
+        temp_df["temp_indexer"] = (
+            temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
+        )
+
+        # Melt the reconciled dataframe
+        reco_df = reco_df.reset_index()
+        reco_df = pd.melt(
+            reco_df,
+            id_vars="unique_id_model",
+            value_vars=reco_df.columns[1:],
+            var_name="temp_indexer",
+            value_name="y",
+        )
+
+        # Split the unique id and the model
+        reco_df["unique_id"] = reco_df["unique_id_model"].apply(
+            lambda x: x.split("-")[0]
+        )
+        reco_df["Base_Model"] = reco_df["unique_id_model"].apply(
+            lambda x: x.split("-")[1]
+        )
+
+        # Add the Model
+        reco_df["Model"] = "TR" + "-" + reco_method + "-" + reco_df["Base_Model"]
+
+        # Drop the unique_id_model and the base model
+        reco_df = reco_df.drop(["unique_id_model", "Base_Model"], axis=1)
+
+        # merge with the base forecasts
+        reco_df = reco_df.merge(
+            temp_df[["unique_id", "temporal_level", "fh", "temp_indexer"]],
+            on=["unique_id", "temp_indexer"],
+            how="left",
+        ).drop("temp_indexer", axis=1)
+
+        return reco_df
+
+    def fit(self, base_fc_df):
+        self.base_fc_df = base_fc_df.copy()
+        # Converts to the right forecast format
+        self.reconciliation_ready_df = self.get_reconciliation_format(base_fc_df)
+
+    def reconcile(self, reconciliation_method):
+        # reconciles
+
+        # Get the Weight matrix
+        self.Wmat = self.compute_matrix_W(reconciliation_method)
+
+        # Reconciles
+        self.reconciled_df = self.get_reconciled_predictions()
+
+        # reverses the format
+        self.reconciled_df = self.reverse_reconciliation_format(reconciliation_method)
+
+        return self.reconciled_df
 
 
 class THieF(object):
