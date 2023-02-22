@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def get_factors(freq):
@@ -174,3 +175,36 @@ def compute_matrix_S(factors):
     S_thief = np.vstack(S_thief)
 
     return S_thief
+
+
+def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
+    """
+    Resamples a dataframe to a given factor
+
+    Args:
+        df (pandas.DataFrame): a dataframe to be resampled
+        factor (int): the factor to resample to
+        bottom_freq (str): the frequency of the bottom level
+        resampled_freq (str): the frequency of the resampled level
+
+
+    Returns:
+        pandas.DataFrame: a resampled dataframe
+    """
+
+    # Take the length of the original dataframe
+    total_obs = df.shape[1]
+
+    # check if the number of observations is divisible by the factor
+    if total_obs % factor != 0:
+        # if not, drop observations from the beginning
+        df = df.iloc[:, total_obs % factor:]
+
+    resample_df = df.resample(
+        str(factor) + bottom_freq, closed="left", label="left", axis=1
+    ).sum()
+
+    # change the frequency of the columns to the resampled_freq
+    resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
+
+    return resample_df
