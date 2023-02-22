@@ -210,9 +210,11 @@ class StatisticalForecaster(object):
         self.h = h
         self.holdout = holdout
 
+        total_test_size = h + cv - 1
+
         if holdout:
             self.y_train, self.y_test = temporal_train_test_split(
-                self.fc_df, test_size=h
+                self.fc_df, test_size=total_test_size
             )
             # Convert y_test to the selected format
             self.y_test = pd.melt(
