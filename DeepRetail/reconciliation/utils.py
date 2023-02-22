@@ -236,3 +236,23 @@ def split_reconciled(out, frequencies):
     return splits
 
 
+def reverse_order(out, frequencies):
+    """
+    Reverse the order of the elements in the `out` list, and return the resulting list.
+
+    Args:
+    - out (List[Any]): The list to reverse.
+    - frequencies (List[int]): A list of integers representing the number of elements in each sublist of `out`.
+
+    Returns:
+    - List[Any]: The reversed version of the `out` list.
+    """
+
+    # Split the `out` list into sublists using the `split_reconciled` function
+    split = split_reconciled(out, frequencies)
+
+    # Reverse the order of the sublists in the `split` list
+    flip = split[::-1]
+
+    # Flatten the list of sublists into a single list and return it
+    return [x for sublist in flip for x in sublist]
