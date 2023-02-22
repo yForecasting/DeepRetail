@@ -136,3 +136,41 @@ def compute_resampled_frequencies(factors, bottom_freq):
     resample_factors = [convert_offset_to_lower_freq(i) for i in resample_factors]
 
     return resample_factors
+
+
+def compute_matrix_S(factors):
+    """
+    Computes the summation matrix s
+
+    Args:
+        factors (list): a list of factors for the temporal levels
+
+    Returns:
+        numpy.ndarray: a numpy array representing the summation matrix S
+
+    """
+
+    # get the total number of factors
+    total_factors = len(factors)
+    # get the highest frequency
+    max_freq = max(factors)
+
+    # initialize a list of numpy arrays for every factor
+    S_thief = [
+        np.zeros((max_freq // factors[k], max_freq)) for k in range(total_factors)
+    ]
+
+    # loop through the factors
+    for k in range(total_factors):
+        # loop through the frequencies
+        for i in range(max_freq // factors[k]):
+            # populate the S_thief matrix
+            S_thief[k][i, factors[k] * i:factors[k] + factors[k] * i] = 1
+
+    # reverse the order of the stacked levels
+    S_thief = S_thief[::-1]
+
+    # stack
+    S_thief = np.vstack(S_thief)
+
+    return S_thief
