@@ -274,3 +274,29 @@ def get_w_matrix_structural(frequencies):
     W_inv = np.diag(weights)
 
     return W_inv
+
+
+def compute_y_tilde(y_hat, Smat, Wmat):
+    # Does matrix multiplication to compute y_tilde
+
+    # The full format of the matrix is like that
+    # S * (S_T * W_inv * S)^-1 S_T * W_inv * pred
+
+    # First get the A = S_T * W_inv * S
+    A = Smat.T @ Wmat @ Smat
+
+    # Inverse A
+    A_inv = np.linalg.inv(A)
+
+    # Now we have: S * A_inv * S_T * W_inv * pred
+    # First take the S* A_inv * S_T
+    B = Smat @ A_inv @ Smat.T
+
+    # Now we have: B * W_inv * pred
+    # First take the B * W_inv
+    C = B @ Wmat
+
+    # Now we have: C * pred
+    y_tilde = C @ y_hat
+
+    return y_tilde
