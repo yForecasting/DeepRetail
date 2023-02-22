@@ -159,7 +159,7 @@ class TemporalReconciler(object):
     def fit(self, base_fc_df):
         self.base_fc_df = base_fc_df.copy()
         # Converts to the right forecast format
-        self.reconciliation_ready_df = self.get_reconciliation_format(base_fc_df)
+        self.reconciliation_ready_df = self.get_reconciliation_format()
 
     def reconcile(self, reconciliation_method):
         # reconciles
@@ -283,3 +283,20 @@ class THieF(object):
 
         if to_return:
             return self.base_forecasts
+
+    def reconcile(self, reconciliation_method):
+        # Reconciles base predictions
+        # Currently only supporting struc
+
+        # Define the TemporalReconciler
+        self.temporal_reconciler = TemporalReconciler(
+            bottom_level_freq=self.bottom_level_freq, factors=self.factors
+        )
+
+        # Fit the reconciler
+        self.temporal_reconciler.fit(self.base_forecasts)
+
+        # Reconcile
+        self.reconciled_df = self.temporal_reconciler.reconcile(reconciliation_method)
+
+        return self.reconciled_df
