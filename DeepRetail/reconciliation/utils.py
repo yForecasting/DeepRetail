@@ -166,7 +166,7 @@ def compute_matrix_S(factors):
         # loop through the frequencies
         for i in range(max_freq // factors[k]):
             # populate the S_thief matrix
-            S_thief[k][i, factors[k] * i:factors[k] + factors[k] * i] = 1
+            S_thief[k][i, factors[k] * i : factors[k] + factors[k] * i] = 1
 
     # reverse the order of the stacked levels
     S_thief = S_thief[::-1]
@@ -198,7 +198,7 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
     # check if the number of observations is divisible by the factor
     if total_obs % factor != 0:
         # if not, drop observations from the beginning
-        df = df.iloc[:, total_obs % factor:]
+        df = df.iloc[:, total_obs % factor :]
 
     resample_df = df.resample(
         str(factor) + bottom_freq, closed="left", label="left", axis=1
