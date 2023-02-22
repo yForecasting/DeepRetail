@@ -28,7 +28,7 @@ class THieF(object):
 
         # Construct all factors if they are not given
         if factors is None:
-            factors = get_factors(self.highest_freq)
+            factors = get_factors(self.bottom_level_numeric_freq)
             self.factors = factors
         else:
             self.factors = factors
@@ -62,7 +62,7 @@ class THieF(object):
 
         # Get the list of the resampled dataframes
         resampled_dfs = [
-            resample_temporal_level(self.original_df, i, self.bottom_freq, j)
+            resample_temporal_level(self.original_df, i, self.bottom_level_freq, j)
             for i, j in zip(self.factors, self.resampled_factors)
         ]
 
