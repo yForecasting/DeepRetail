@@ -344,13 +344,17 @@ class StatisticalForecaster(object):
             # get a dictionary of dates and their corresponding fh
             fh_dict = dict(zip(dates, np.arange(1, len(dates) + 1)))
             # add the fh
-            self.forecast_df["fh"] = [fh_dict[date] for date in self.forecast_df["date"].values]
+            self.forecast_df["fh"] = [
+                fh_dict[date] for date in self.forecast_df["date"].values
+            ]
             # also add the cv
-            self.forecast_df['cv'] = None
+            self.forecast_df["cv"] = None
 
-    def get_residuals(self):
+    def get_one_step_ahead_residuals(self):
         """
         Generates residuals for the fitted models.
+        Its used for the residual analysis.
+        Computes 1-step ahead residuals only
 
         Args:
             None
