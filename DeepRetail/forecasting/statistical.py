@@ -537,3 +537,51 @@ class StatisticalForecaster(object):
             ax3.set_facecolor((gray_scale, gray_scale, gray_scale))
 
             plt.show()
+
+    def compute_full_residuals(self, model, cv, name):
+        """
+        For every model estimates the residuals for all horizons.
+
+        Args:
+            model : sktime.BaseForecaster
+                A sktime forecaster model to use for generating predictions.
+            cv : sktime.BaseCrossValidator
+                A sktime cross-validator to use for generating predictions.
+            name : str
+                The name of the model to use.
+
+        Returns:
+            pandas.DataFrame
+                The residuals for all models and horizons.
+
+        """
+
+        res = model.update_predict(self.y_train, cv)
+
+        # Convert to the right format
+        res = (
+            res.unstack()
+            .unstack(level=1)
+            .reset_index()
+            .rename(columns={"level_0": "cutoff", "Period": "date"})
+        )
+        res = pd.melt(
+            res,
+            id_vars=["date", "cutoff"],
+            value_vars=res.columns[2:],
+            value_name="y_pred",
+            var_name="unique_id",
+        )
+        # Add the cv and the fh
+        cv_vals = sorted(res["cutoff"].unique())
+        fh_vals = sorted(res["date"].unique())
+
+        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+        fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
+
+        res["fh"] = [fh_dict[date] for date in res["date"].values]
+        res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
+
+        res["Model"] = name
+
+        return res
