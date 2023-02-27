@@ -538,7 +538,7 @@ class StatisticalForecaster(object):
 
             plt.show()
 
-    def compute_full_residuals(self, model, cv, name):
+    def compute_full_insample_forecasts(self, model, cv, name):
         """
         For every model estimates the residuals for all horizons.
 
@@ -585,3 +585,4 @@ class StatisticalForecaster(object):
         res["Model"] = name
 
         return res
+
