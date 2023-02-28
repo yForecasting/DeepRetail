@@ -350,7 +350,7 @@ class StatisticalForecaster(object):
             # also add the cv
             self.forecast_df["cv"] = None
 
-    def residual_diagnosis(self, model, type, agg_func=None, n=None, index_ids=None):
+    def residual_diagnosis(self, model, type, agg_func=None, n=1, index_ids=None):
         """
         Plots the residuals for a given model together with the ACF plot and a histogram.
 
@@ -372,11 +372,17 @@ class StatisticalForecaster(object):
         """
 
         # Get residuals if we haven't already
-        if self.residuals is None:
-            self.get_residuals()
+        self.calculate_residuals()
 
         # filter residuals for the given model
         f_res = self.residuals[self.residuals["Model"] == model]
+
+        # Convert the df to the right format
+        # 1st: Keep only 1-step ahead residuals
+        f_res = f_res[f_res["fh"] == 1]
+        # 2nd: Drop columns and rename
+        to_keep = ['date', 'unique_id', 'residual', 'Model']
+        f_res = f_res[to_keep].rename(columns={'date': 'Period'})
 
         # if we have to aggregate
         if type == "aggregate":
@@ -570,7 +576,10 @@ class StatisticalForecaster(object):
         res = pd.merge(res, true_df, on=["unique_id", "date"])
 
         # Calculate the residual
-        res["Residual"] = res["y_true"] - res["y_pred"]
+        res["residual"] = res["y_true"] - res["y_pred"]
+
+        # Add to the object
+        self.residuals = res
 
         # Return
         return res
