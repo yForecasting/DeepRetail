@@ -529,7 +529,7 @@ class StatisticalForecaster(object):
 
         return res
 
-    def get_total_residuals(self):
+    def calculate_residuals(self):
         """
         Calculate residuals for all horizons.
 
