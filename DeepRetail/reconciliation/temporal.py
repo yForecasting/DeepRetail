@@ -82,7 +82,7 @@ class TemporalReconciler(object):
 
         # For structural scalling
         if reconciliation_method == "struc":
-            Wmat = get_w_matrix_structural(self.frequencies)
+            Wmat = get_w_matrix_structural(self.frequencies, len(self.reconciliation_ready_df))
 
         elif reconciliation_method == "mse":
             # here get residuals for all levels
@@ -105,7 +105,7 @@ class TemporalReconciler(object):
         cols = self.reconciliation_ready_df.columns
 
         # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
-        reconciled_values = [compute_y_tilde(y, self.Smat, self.Wmat) for y in values]
+        reconciled_values = [compute_y_tilde(y, self.Smat, mat) for y, mat in zip(values, self.Wmat)]
 
         # Convert to dataframe
         reconcilded_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
