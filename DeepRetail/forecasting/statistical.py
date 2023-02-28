@@ -503,32 +503,52 @@ class StatisticalForecaster(object):
 
         res = model.update_predict(self.y_train, cv, update_params=False)
 
-        # Convert to the right format
-        res = (
-            res.unstack()
-            .unstack(level=1)
-            .reset_index()
-            .rename(columns={"level_0": "cutoff", "Period": "date"})
-        )
-        res = pd.melt(
-            res,
-            id_vars=["date", "cutoff"],
-            value_vars=res.columns[2:],
-            value_name="y_pred",
-            var_name="unique_id",
-        )
+        if self.h > 1:
+            # Convert to the right format
+            res = (
+                res.unstack()
+                .unstack(level=1)
+                .reset_index()
+                .rename(columns={"level_0": "cutoff", "Period": "date"})
+            )
+            res = pd.melt(
+                res,
+                id_vars=["date", "cutoff"],
+                value_vars=res.columns[2:],
+                value_name="y_pred",
+                var_name="unique_id",
+            )
 
-        # Drop NaNs
-        res = res.dropna(axis=0, subset=["y_pred"])
+            # Drop NaNs
+            res = res.dropna(axis=0, subset=["y_pred"])
 
-        # Add the cv and the fh
-        cv_vals = sorted(res["cutoff"].unique())
-        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
-        res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
+            # Add the cv and the fh
+            cv_vals = sorted(res["cutoff"].unique())
+            cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+            res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
 
-        # Add the forecast horizon.
-        fh_vals = np.tile(self.fh, int(len(res) / self.h))
-        res["fh"] = fh_vals
+            # Add the forecast horizon.
+            fh_vals = np.tile(self.fh, int(len(res) / self.h))
+            res["fh"] = fh_vals
+
+        else:
+            res = (
+                res.unstack()
+                .reset_index()
+                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y_pred"})
+            )
+
+            # add fh and cv
+            res["fh"] = 1
+            res["cv"] = 1
+
+            # Add the cutoff
+            cutoff_period = pd.date_range(
+                end=res["date"].values[-2].to_timestamp(),
+                periods=len(res["date"].unique()),
+                freq=self.freq,
+            )
+            res["cutoff"] = np.tile(cutoff_period, len(res["unique_id"].unique()))
 
         # Add the model name
         res["Model"] = name
