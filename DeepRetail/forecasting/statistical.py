@@ -381,8 +381,8 @@ class StatisticalForecaster(object):
         # 1st: Keep only 1-step ahead residuals
         f_res = f_res[f_res["fh"] == 1]
         # 2nd: Drop columns and rename
-        to_keep = ['date', 'unique_id', 'residual', 'Model']
-        f_res = f_res[to_keep].rename(columns={'date': 'Period'})
+        to_keep = ["date", "unique_id", "residual", "Model"]
+        f_res = f_res[to_keep].rename(columns={"date": "Period"})
 
         # if we have to aggregate
         if type == "aggregate":
@@ -519,7 +519,7 @@ class StatisticalForecaster(object):
         )
 
         # Drop NaNs
-        res = res.dropna(axis=0, subset=['y_pred'])
+        res = res.dropna(axis=0, subset=["y_pred"])
 
         # Add the cv and the fh
         cv_vals = sorted(res["cutoff"].unique())
@@ -527,7 +527,7 @@ class StatisticalForecaster(object):
         res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
 
         # Add the forecast horizon.
-        fh_vals = np.tile(self.fh, int(len(res)/self.h))
+        fh_vals = np.tile(self.fh, int(len(res) / self.h))
         res["fh"] = fh_vals
 
         # Add the model name
