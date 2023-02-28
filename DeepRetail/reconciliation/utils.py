@@ -258,7 +258,7 @@ def reverse_order(out, frequencies):
     return [x for sublist in flip for x in sublist]
 
 
-def get_w_matrix_structural(frequencies):
+def get_w_matrix_structural(frequencies, total_ts):
     # computes the reconciliation matrix for structural scalling
 
     # Get the factors
@@ -272,6 +272,12 @@ def get_w_matrix_structural(frequencies):
 
     # Then convert to diagonal
     W_inv = np.diag(weights)
+
+    # Repeat the matrix for each time series
+    W_inv = np.dstack([W_inv]*total_ts)
+
+    # Move the time series axis to the front
+    W_inv = np.moveaxis(W_inv, -1, 0)
 
     return W_inv
 
