@@ -85,6 +85,7 @@ class TemporalReconciler(object):
             Wmat = get_w_matrix_structural(self.frequencies)
 
         elif reconciliation_method == "mse":
+            # here get residuals for all levels
             ...
 
         elif reconciliation_method == "variance":
@@ -281,8 +282,35 @@ class THieF(object):
             .rename(columns={"level_0": "temporal_level"})
         )
 
+        # Get the residuals here
+
         if to_return:
             return self.base_forecasts
+
+    def get_residuals(self):
+        # Estimate residuals for all base forecasters
+        temp_residuals = {
+            factor: self.base_forecasts[factor].calculate_residuals()
+            for factor in self.factors
+        }
+
+        # concat
+        temp_residuals = pd.concat(temp_residuals, axis=0)
+
+        # add to the right format
+        temp_residuals = (
+            temp_residuals.reset_index()
+            .drop("level_1", axis=1)
+            .rename(columns={"level_0": "temporal_level"})
+        )
+
+        # keep only relevant columns
+        to_keep = ["temporal_level", "unique_id", "cv", "fh", "Model", "residual"]
+
+        # Add to the object
+        self.base_forecast_residuals = temp_residuals[to_keep]
+
+        return self.base_forecast_residuals
 
     def reconcile(self, reconciliation_method):
         # Reconciles base predictions
