@@ -561,7 +561,7 @@ class StatisticalForecaster(object):
 
         # Define the new cross-validator
         cross_validator = SlidingWindowSplitter(
-            window_length=1, fh=self.fh, step_length=1
+            window_length=self.seasonal_length, fh=self.fh, step_length=1
         )
 
         # Estiamte residuals for all models
