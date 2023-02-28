@@ -556,7 +556,7 @@ class StatisticalForecaster(object):
 
         """
 
-        res = model.update_predict(self.y_train, cv)
+        res = model.update_predict(self.y_train, cv, update_params=False)
 
         # Convert to the right format
         res = (
@@ -585,4 +585,3 @@ class StatisticalForecaster(object):
         res["Model"] = name
 
         return res
-
