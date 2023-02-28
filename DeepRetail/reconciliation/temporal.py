@@ -291,7 +291,7 @@ class THieF(object):
     def get_residuals(self):
         # Estimate residuals for all base forecasters
         temp_residuals = {
-            factor: self.base_forecasts[factor].calculate_residuals()
+            factor: self.base_forecasters[factor].calculate_residuals()
             for factor in self.factors
         }
 
