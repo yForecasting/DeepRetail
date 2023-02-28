@@ -148,9 +148,12 @@ class TemporalReconciler(object):
         # Drop the unique_id_model and the base model
         reco_df = reco_df.drop(["unique_id_model", "Base_Model"], axis=1)
 
+        # rename the column for base forecasts
+        temp_df = temp_df.rename(columns={"y": "y_base"})
+
         # merge with the base forecasts
         reco_df = reco_df.merge(
-            temp_df[["unique_id", "temporal_level", "fh", "temp_indexer"]],
+            temp_df[["unique_id", "temporal_level", "fh", "temp_indexer", 'y_base']],
             on=["unique_id", "temp_indexer"],
             how="left",
         ).drop("temp_indexer", axis=1)
@@ -328,4 +331,5 @@ class THieF(object):
         # Reconcile
         self.reconciled_df = self.temporal_reconciler.reconcile(reconciliation_method)
 
+        # Merge with the base forecasts
         return self.reconciled_df
