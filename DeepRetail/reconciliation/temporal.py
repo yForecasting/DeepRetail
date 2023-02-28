@@ -283,6 +283,7 @@ class THieF(object):
         )
 
         # Get the residuals here
+        self.get_residuals()
 
         if to_return:
             return self.base_forecasts
