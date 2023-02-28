@@ -8,6 +8,7 @@ from DeepRetail.reconciliation.utils import (
     reverse_order,
     get_w_matrix_structural,
     compute_y_tilde,
+    get_w_matrix_mse,
 )
 import numpy as np
 import pandas as pd
@@ -77,16 +78,31 @@ class TemporalReconciler(object):
 
         return temp_df
 
-    def compute_matrix_W(self, reconciliation_method):
+    def compute_matrix_W(self, reconciliation_method, residual_df=None):
         # Computes the matrix W
 
         # For structural scalling
         if reconciliation_method == "struc":
-            Wmat = get_w_matrix_structural(self.frequencies, len(self.reconciliation_ready_df))
+            Wmat = get_w_matrix_structural(
+                self.frequencies, len(self.reconciliation_ready_df)
+            )
 
         elif reconciliation_method == "mse":
-            # here get residuals for all levels
-            ...
+            if residual_df is None:
+                raise ValueError("Residuals should be given for mse reconciliation")
+
+            # Get the squared residuals
+            residual_df["residual_squarred"] = residual_df["residual"] ** 2
+
+            # Groupby unique_id, temporal_level and fh and get the Mean Squared Error
+            residual_df = (
+                residual_df.groupby(["unique_id", "temporal_level", "fh"])
+                .agg({"residual_squarred": "mean"})
+                .reset_index()
+            )
+
+            # Get the matrix W
+            Wmat = get_w_matrix_mse(residual_df)
 
         elif reconciliation_method == "variance":
             ...
@@ -105,7 +121,9 @@ class TemporalReconciler(object):
         cols = self.reconciliation_ready_df.columns
 
         # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
-        reconciled_values = [compute_y_tilde(y, self.Smat, mat) for y, mat in zip(values, self.Wmat)]
+        reconciled_values = [
+            compute_y_tilde(y, self.Smat, mat) for y, mat in zip(values, self.Wmat)
+        ]
 
         # Convert to dataframe
         reconcilded_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
@@ -153,7 +171,7 @@ class TemporalReconciler(object):
 
         # merge with the base forecasts
         reco_df = reco_df.merge(
-            temp_df[["unique_id", "temporal_level", "fh", "temp_indexer", 'y_base']],
+            temp_df[["unique_id", "temporal_level", "fh", "temp_indexer", "y_base"]],
             on=["unique_id", "temp_indexer"],
             how="left",
         ).drop("temp_indexer", axis=1)
@@ -165,11 +183,13 @@ class TemporalReconciler(object):
         # Converts to the right forecast format
         self.reconciliation_ready_df = self.get_reconciliation_format()
 
-    def reconcile(self, reconciliation_method):
+    def reconcile(self, reconciliation_method, residual_df=None):
         # reconciles
 
         # Get the Weight matrix
-        self.Wmat = self.compute_matrix_W(reconciliation_method)
+        self.Wmat = self.compute_matrix_W(
+            reconciliation_method, residual_df=residual_df
+        )
 
         # Reconciles
         self.reconciled_df = self.get_reconciled_predictions()
@@ -329,7 +349,9 @@ class THieF(object):
         self.temporal_reconciler.fit(self.base_forecasts)
 
         # Reconcile
-        self.reconciled_df = self.temporal_reconciler.reconcile(reconciliation_method)
+        self.reconciled_df = self.temporal_reconciler.reconcile(
+            reconciliation_method, residual_df=self.base_forecast_residuals
+        )
 
         # Merge with the base forecasts
         return self.reconciled_df
