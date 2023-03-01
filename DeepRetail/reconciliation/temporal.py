@@ -245,16 +245,82 @@ class THieF(object):
         self.original_df = original_df
         self.holdout = holdout
 
-        # Get the list of the resampled dataframes
-        resampled_dfs = [
-            resample_temporal_level(self.original_df, i, self.bottom_level_freq, j)
-            for i, j in zip(self.factors, self.resampled_factors)
-        ]
+        # If we have holdout:
+        if self.holdout:
+            # Initialize variables
+            self.cv = cv
+            end_point = self.bottom_level_numeric_freq + self.cv - 1
 
-        # convert it to a dictionary with the factors as keys
-        self.resampled_dfs = {
-            self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
-        }
+            # Initialie lists for train and test
+            self.resampled_train_dfs = []
+            self.resampled_test_dfs = []
+
+            for z in range(self.cv):
+                # Manual cross-validation
+                # Define start and end points for each fold
+                temp_startpoint = end_point - z
+                temp_endpoint = cv - z - 1
+
+                # Split
+                temp_test_df = (
+                    self.original_df.iloc[:, -temp_startpoint:-temp_endpoint]
+                    if temp_endpoint != 0
+                    else self.original_df.iloc[:, -temp_startpoint:]
+                )
+                temp_train_df = self.original_df.iloc[:, :-temp_startpoint]
+
+                # Resample train first
+                temp_resampled_train_df = [
+                    resample_temporal_level(temp_train_df, i, self.bottom_level_freq, j)
+                    for i, j in zip(self.factors, self.resampled_factors)
+                ]
+                # Convert to dictionary with factors as keys
+                self.resampled_dfs = {
+                    self.factors[i]: temp_resampled_train_df[i]
+                    for i in range(len(self.factors))
+                }
+
+                # add to list
+                self.resampled_train_dfs.append(self.resampled_dfs)
+
+                # Repeat for test set
+                # I also melt to merge right away
+                temp_resampled_test_df = [
+                    (
+                        resample_temporal_level(
+                            temp_test_df, i, self.bottom_level_freq, j
+                        )
+                        .reset_index()
+                        .melt(id_vars="unique_id", value_name="y_true", var_name="date")
+                    )
+                    for i, j in zip(self.factors, self.resampled_factors)
+                ]
+                # Add the factor as temporal level to each test dataframe
+                for i in range(len(self.factors)):
+                    temp_resampled_test_df[i]["temporal_level"] = self.factors[i]
+
+                # Concat the list
+                self.resampled_test_dfs.append(pd.concat(temp_resampled_test_df))
+
+            # Add the cv to each test set
+            for i in range(len(self.resampled_test_dfs)):
+                self.resampled_test_dfs[i]["cv"] = i + 1
+
+            # Concat
+            self.resampled_test_dfs = pd.concat(self.resampled_test_dfs)
+
+        # If not, generate a single split.
+        else:
+            # Get the list of the resampled dataframes
+            resampled_dfs = [
+                resample_temporal_level(self.original_df, i, self.bottom_level_freq, j)
+                for i, j in zip(self.factors, self.resampled_factors)
+            ]
+
+            # convert it to a dictionary with the factors as keys
+            self.resampled_dfs = {
+                self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
+            }
 
     def predict(self, models, to_return=True):
         # generates base forecasts
@@ -271,42 +337,118 @@ class THieF(object):
                 "The number of models should be equal to the number of factors"
             )
 
-        # Initiaze a StatisticalForecaster for each factor
-        # Currently only supporting StatisticalForecaster
-        self.base_forecasters = {
-            factor: StatisticalForecaster(
-                models=models[factor], freq=self.resampled_factors[i]
+        # If we have holdout
+        if self.holdout:
+            # Initialize a list for the base forecasts and residuals
+            temp_total_base_forecasts = []
+            temp_total_residuals = []
+
+            for z in range(self.cv):
+                # Take the temporal hierarchy for the fold
+                self.resampled_dfs = self.resampled_train_dfs[z]
+
+                # Initialize a StatisticalForecaster for each factor
+                # Currently only supporting StatisticalForecaster
+                self.base_forecasters = {
+                    factor: StatisticalForecaster(
+                        models=models[factor], freq=self.resampled_factors[i]
+                    )
+                    for i, factor in enumerate(self.factors)
+                }
+
+                # Fit
+                for factor in self.factors:
+                    self.base_forecasters[factor].fit(
+                        self.resampled_dfs[factor], format="pivoted"
+                    )
+
+                # Generate base forecasts
+                temp_base_forecasts = {
+                    factor: self.base_forecasters[factor].predict(
+                        h=self.frequencies[i], holdout=False
+                    )
+                    for i, factor in enumerate(self.factors)
+                }
+
+                # Concat in a single dataframe
+                self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
+
+                # Reset index and drop column from multi-index
+                # also rename the remaining idnex to get the temporal level
+                self.base_forecasts = (
+                    self.base_forecasts.reset_index()
+                    .drop(columns="level_1")
+                    .rename(columns={"level_0": "temporal_level"})
+                )
+
+                # Get residuals
+                # NOTE: change the get_residual to accept as argument the df
+                # This way I can have temp dataframes instead of self.resampled_dfs
+
+                temp_residuals = self.get_residuals()
+
+                # Add the cv to the predictions and the cv
+                self.base_forecasts["cv"] = z + 1
+                temp_residuals["cv"] = z + 1
+
+                # Add to list
+                temp_total_base_forecasts.append(self.base_forecasts)
+                temp_total_residuals.append(temp_residuals)
+
+            # Concat
+            self.base_forecasts = pd.concat(temp_total_base_forecasts)
+            self.base_forecast_residuals = pd.concat(temp_total_residuals)
+
+            # Merge with the true
+            self.base_forecasts = pd.merge(
+                self.base_forecasts,
+                self.resampled_test_dfs,
+                on=["unique_id", "date", "temporal_level", "cv"],
+                how="left",
             )
-            for i, factor in enumerate(self.factors)
-        }
 
-        # Fit the forecasters
-        for factor in self.factors:
-            self.base_forecasters[factor].fit(
-                self.resampled_dfs[factor], format="pivoted"
+            # Return the predictions
+            if to_return:
+                return self.base_forecasts
+
+        # If we dont have holdout
+        else:
+            # Initiaze a StatisticalForecaster for each factor
+            # Currently only supporting StatisticalForecaster
+            self.base_forecasters = {
+                factor: StatisticalForecaster(
+                    models=models[factor], freq=self.resampled_factors[i]
+                )
+                for i, factor in enumerate(self.factors)
+            }
+
+            # Fit the forecasters
+            for factor in self.factors:
+                self.base_forecasters[factor].fit(
+                    self.resampled_dfs[factor], format="pivoted"
+                )
+
+            # Generate base forecasts
+            temp_base_forecasts = {
+                factor: self.base_forecasters[factor].predict(
+                    h=self.frequencies[i], holdout=False
+                )
+                for i, factor in enumerate(self.factors)
+            }
+
+            # Concat in a single dataframe
+            self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
+
+            # Reset index and drop column from multi-index
+            # Also rename the remaining index to get the temporal level
+            self.base_forecasts = (
+                self.base_forecasts.reset_index()
+                .drop("level_1", axis=1)
+                .rename(columns={"level_0": "temporal_level"})
             )
 
-        # Generate base forecasts
-        temp_base_forecasts = {
-            factor: self.base_forecasters[factor].predict(
-                h=self.frequencies[i], holdout=False
-            )
-            for i, factor in enumerate(self.factors)
-        }
-
-        # Concat in a single dataframe
-        self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
-
-        # Reset index and drop column from multi-index
-        # Also rename the remaining index to get the temporal level
-        self.base_forecasts = (
-            self.base_forecasts.reset_index()
-            .drop("level_1", axis=1)
-            .rename(columns={"level_0": "temporal_level"})
-        )
-
-        # Get the residuals here
-        self.get_residuals()
+            # Get the residuals here
+            self.get_residuals()
 
         if to_return:
             return self.base_forecasts
