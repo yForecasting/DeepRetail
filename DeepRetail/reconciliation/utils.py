@@ -274,7 +274,7 @@ def get_w_matrix_structural(frequencies, total_ts):
     W_inv = np.diag(weights)
 
     # Repeat the matrix for each time series
-    W_inv = np.dstack([W_inv]*total_ts)
+    W_inv = np.dstack([W_inv] * total_ts)
 
     # Move the time series axis to the front
     W_inv = np.moveaxis(W_inv, -1, 0)
@@ -292,7 +292,13 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     A = Smat.T @ Wmat @ Smat
 
     # Inverse A
-    A_inv = np.linalg.inv(A)
+    try:
+        A_inv = np.linalg.inv(A)
+    except np.linalg.LinAlgError:
+        # A fallaback in case the matrix is not invertible due to det = 0
+        # This is the pseudo inverse of A
+        # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
+        A_inv = np.linalg.pinv(A)
 
     # Now we have: S * A_inv * S_T * W_inv * pred
     # First take the S* A_inv * S_T
@@ -306,3 +312,36 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     y_tilde = C @ y_hat
 
     return y_tilde
+
+
+def get_w_matrix_mse(res_df):
+    # Get the unique_id for all time seris
+    unique_ts = res_df["unique_id"].unique()
+
+    # Loop over the unique time series to construct unique W matrices
+    for i, ts in enumerate(unique_ts):
+        # Filter the df
+        temp_df = res_df[res_df["unique_id"] == ts]
+
+        # Get them on the right order
+        # sort temp_df descending based on temporal_level first and ascending based on fh
+        temp_df = temp_df.sort_values(
+            by=["temporal_level", "fh"], ascending=[False, True]
+        )
+
+        # take the values of the mse
+        temp_mse = temp_df["residual_squarred"].values
+        # get the weights for each level
+        temp_weights = 1 / temp_mse
+        # Convert to diagonal matrix
+        temp_W = np.diag(temp_weights)
+
+        # Initialize matrix if it does not exist
+        if i == 0:
+            # add an extra dimension to the matrix
+            W_inv = temp_W[np.newaxis, :, :]
+        else:
+            # add the matrix to the stack
+            W_inv = np.concatenate((W_inv, temp_W[np.newaxis, :, :]), axis=0)
+
+    return W_inv
