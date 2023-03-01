@@ -178,24 +178,94 @@ class TemporalReconciler(object):
 
         return reco_df
 
-    def fit(self, base_fc_df):
-        self.base_fc_df = base_fc_df.copy()
-        # Converts to the right forecast format
-        self.reconciliation_ready_df = self.get_reconciliation_format()
+    def fit(self, base_fc_df, holdout=False, cv=None):
+        self.holdout = holdout
+        self.cv = cv
+
+        # if we have holdout:
+        if self.holdout:
+            # Initialize a list for the each fold
+            self.reconciled_df_list = []
+
+            # Keep this one to filter later
+            self.original_df = base_fc_df.copy()
+
+            # Itterate over the folds
+            for k in range(self.cv):
+                # Filter on the cv
+                self.base_fc_df = self.original_df[self.original_df["cv"] == k + 1]
+
+                # Converts to the right forecast format
+                self.reconciliation_ready_df = self.get_reconciliation_format()
+
+                # Append
+                self.reconciled_df_list.append(self.reconciliation_ready_df)
+
+        else:
+            self.base_fc_df = base_fc_df.copy()
+            # Converts to the right forecast format
+            self.reconciliation_ready_df = self.get_reconciliation_format()
 
     def reconcile(self, reconciliation_method, residual_df=None):
         # reconciles
 
-        # Get the Weight matrix
-        self.Wmat = self.compute_matrix_W(
-            reconciliation_method, residual_df=residual_df
-        )
+        # If we have a holdout
+        if self.holdout:
+            # Initialize a list for the each fold
+            reconciled_df_list = []
 
-        # Reconciles
-        self.reconciled_df = self.get_reconciled_predictions()
+            # Itterate over folds
+            for k in range(self.cv):
+                # Filter on the fold
+                self.base_fc_df = self.original_df[self.original_df["cv"] == k + 1]
+                self.reconciliation_ready_df = self.reconciled_df_list[k]
+                temp_residual_df = residual_df[residual_df["cv"] == k + 1]
 
-        # reverses the format
-        self.reconciled_df = self.reverse_reconciliation_format(reconciliation_method)
+                # Get the Weight matrix
+                self.Wmat = self.compute_matrix_W(
+                    reconciliation_method, residual_df=temp_residual_df
+                )
+
+                # Reconciles
+                self.reconciled_df = self.get_reconciled_predictions()
+
+                # reverses the format
+                self.reconciled_df = self.reverse_reconciliation_format(
+                    reconciliation_method
+                )
+
+                # Add the cv
+                self.reconciled_df["cv"] = k + 1
+
+                # Append
+                reconciled_df_list.append(self.reconciled_df)
+
+            # concat
+            self.reconciled_df = pd.concat(reconciled_df_list)
+
+            # Add the true values
+            true_vals_df = self.original_df.copy().drop(["y", "Model"], axis=1)
+
+            # merge
+            self.reconciled_df = self.reconciled_df.merge(
+                true_vals_df, on=["unique_id", "temporal_level", "fh", "cv"], how="left"
+            )
+
+            return self.reconciled_df
+
+        else:
+            # Get the Weight matrix
+            self.Wmat = self.compute_matrix_W(
+                reconciliation_method, residual_df=residual_df
+            )
+
+            # Reconciles
+            self.reconciled_df = self.get_reconciled_predictions()
+
+            # reverses the format
+            self.reconciled_df = self.reverse_reconciliation_format(
+                reconciliation_method
+            )
 
         return self.reconciled_df
 
