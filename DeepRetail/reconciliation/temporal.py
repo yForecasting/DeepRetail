@@ -314,11 +314,12 @@ class THieF(object):
 
         self.original_df = original_df
         self.holdout = holdout
+        self.cv = cv
 
         # If we have holdout:
         if self.holdout:
             # Initialize variables
-            self.cv = cv
+
             end_point = self.bottom_level_numeric_freq + self.cv - 1
 
             # Initialie lists for train and test
@@ -518,7 +519,7 @@ class THieF(object):
             )
 
             # Get the residuals here
-            self.get_residuals()
+            self.base_forecast_residuals = self.get_residuals()
 
         if to_return:
             return self.base_forecasts
@@ -544,9 +545,9 @@ class THieF(object):
         to_keep = ["temporal_level", "unique_id", "cv", "fh", "Model", "residual"]
 
         # Add to the object
-        self.base_forecast_residuals = temp_residuals[to_keep]
+        # self.base_forecast_residuals = temp_residuals[to_keep]
 
-        return self.base_forecast_residuals
+        return temp_residuals[to_keep]
 
     def reconcile(self, reconciliation_method):
         # Reconciles base predictions
@@ -558,7 +559,9 @@ class THieF(object):
         )
 
         # Fit the reconciler
-        self.temporal_reconciler.fit(self.base_forecasts)
+        self.temporal_reconciler.fit(
+            self.base_forecasts, holdout=self.holdout, cv=self.cv
+        )
 
         # Reconcile
         self.reconciled_df = self.temporal_reconciler.reconcile(
