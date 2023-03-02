@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
+def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
     """
     Converts a transaction df to a pivoted df.
     Each row is a unique id and columns are the dates.
@@ -40,13 +40,14 @@ def pivoted_df(df, target_frequency, agg_func=None, fill_values=True):
     # Drop values with full nans
     pivot_df = pivot_df.dropna(axis=0, how="all")
 
-    # Resamples with the given function
-    # for sales data
-    if agg_func == "sum":
-        pivot_df = pivot_df.resample(target_frequency, axis=1).sum()
-    # for stock data
-    elif agg_func == "constant":
-        pivot_df = pivot_df.resample(target_frequency, axis=1).last()
+    if target_frequency is not None:
+        # Resamples with the given function
+        # for sales data
+        if agg_func == "sum":
+            pivot_df = pivot_df.resample(target_frequency, axis=1).sum()
+        # for stock data
+        elif agg_func == "constant":
+            pivot_df = pivot_df.resample(target_frequency, axis=1).last()
 
     # Fills missing values
     if fill_values:
@@ -129,6 +130,6 @@ def sktime_forecast_format(df, format="transaction"):
 
         # Transpose and rename
         df = df.T
-        df.index.names = ['Period']
+        df.index.names = ["Period"]
 
     return df
