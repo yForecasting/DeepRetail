@@ -23,78 +23,63 @@ class TemporalReconciler(object):
     Can handle simmulnteous reconciliation of multiple time series.
     Is also extended to support cross validation.
 
-    Parameters
-    ----------
-    bottom_level_freq : str
-        The frequency of the bottom level forecasts.
-        Should be given if factors are not given.
-    factors : list, optional
-        The factors to use for the reconciliation.
-        Should be given if bottom_freq is not given.
-    top_fh : int, optional
-        The forecast horizon of the top level forecasts.
-        The default is 1.
+    Args:
+        bottom_level_freq : str
+            The frequency of the bottom level forecasts.
+        bottom_level_numeric_freq : int
+            The numeric frequency of the bottom level forecasts.
+        factors : list
+            The factors to use for the reconciliation.
+        fhs : list
+            The forecast horizons of the forecasts.
+        frequencies : list
+            The frequencies of the forecasts.
+        m : list
+            The frequencies of the forecasts.
+        max_freq : int
+            The maximum frequency of the forecasts.
+        total_levels : int
+            The total number of levels.
+        Smat : numpy.ndarray
+            The matrix S.
+        base_fc_df : pandas.DataFrame
+            The base forecasts.
+        reconciliation_ready_df : pandas.DataFrame
+            The base forecasts in the format for reconciliation.
+        Wmat : numpy.ndarray
+            The matrix W with the reconciliation weights
+        reconciled_predictions : pandas.DataFrame
+            The reconciled predictions.
 
-    Attributes
-    ----------
-    bottom_level_freq : str
-        The frequency of the bottom level forecasts.
-    bottom_level_numeric_freq : int
-        The numeric frequency of the bottom level forecasts.
-    factors : list
-        The factors to use for the reconciliation.
-    fhs : list
-        The forecast horizons of the forecasts.
-    frequencies : list
-        The frequencies of the forecasts.
-    m : list
-        The frequencies of the forecasts.
-    max_freq : int
-        The maximum frequency of the forecasts.
-    total_levels : int
-        The total number of levels.
-    Smat : numpy.ndarray
-        The matrix S.
-    base_fc_df : pandas.DataFrame
-        The base forecasts.
-    reconciliation_ready_df : pandas.DataFrame
-        The base forecasts in the format for reconciliation.
-    Wmat : numpy.ndarray
-        The matrix W with the reconciliation weights
-    reconciled_predictions : pandas.DataFrame
-        The reconciled predictions.
+    Methods:
+        get_reconciliation_format()
+            Converts the base forecasts to the format for reconciliation.
+        compute_matrix_W(reconciliation_method, residual_df=None)
+            Computes the matrix W.
+        get_reconciled_predictions()
+            Gets the reconciled predictions.
 
-    Methods
-    -------
-    get_reconciliation_format()
-        Converts the base forecasts to the format for reconciliation.
-    compute_matrix_W(reconciliation_method, residual_df=None)
-        Computes the matrix W.
-    get_reconciled_predictions()
-        Gets the reconciled predictions.
+    Examples:
+        >>> from DeepRetail.reconciliation.temporal import TemporalReconciler
+        >>> import pandas as pd
 
-    Examples
-    --------
-    >>> from DeepRetail.reconciliation.temporal import TemporalReconciler
-    >>> import pandas as pd
+        >>> # Create a reconciler
+        >>> temporal_reconciler = TemporalReconciler(bottom_level_freq = 'Q')
 
-    >>> # Create a reconciler
-    >>> temporal_reconciler = TemporalReconciler(bottom_level_freq = 'Q')
+        >>> # Create the base forecasts
+        >>> base_fc_df = pd.DataFrame({
+        ...     'unique_id': ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'],
+        ...     'temporal_level': [1, 2, 2, 4, 4, 4, 4],
+        ...     'fh': [1, 1, 2, 1, 2, 3, 4],
+        ...     'y': [20, 12, 11, 5, 3, 4, 2],
+        ...     'Model': ['Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1']
+        ... })
 
-    >>> # Create the base forecasts
-    >>> base_fc_df = pd.DataFrame({
-    ...     'unique_id': ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'],
-    ...     'temporal_level': [1, 2, 2, 4, 4, 4, 4],
-    ...     'fh': [1, 1, 2, 1, 2, 3, 4],
-    ...     'y': [20, 12, 11, 5, 3, 4, 2],
-    ...     'Model': ['Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1']
-    ... })
+        >>> # Fit the reconciler
+        >>> temporal_reconciler.fit(base_fc_df)
 
-    >>> # Fit the reconciler
-    >>> temporal_reconciler.fit(base_fc_df)
-
-    >>> # Reconcile
-    >>> reconciled = temporal_reconciler.reconcile('struc')
+        >>> # Reconcile
+        >>> reconciled = temporal_reconciler.reconcile('struc')
     """
 
     def __init__(self, bottom_level_freq, factors=None, top_fh=1):
@@ -436,6 +421,63 @@ class TemporalReconciler(object):
 
 
 class THieF(object):
+
+    """
+    A class for the Temporal Hierarcies Forecasting (THieF) algorithm.
+
+    The flow of the class is the following:
+    (1) Construct all temporal levels based on the bottom level frequency or the given factors
+    (2) Fits a base forecasting model for each temporal level
+    (3) Generates predictions for each level (base forecasts)
+    (4) Reconciles base forecasts to get coherent predictions
+
+    References:
+        [1] https://www.sciencedirect.com/science/article/pii/S0377221717301911
+        [2] https://github.com/cran/thief
+
+    Args:
+        bottom_level_freq (str):
+            The frequency of the bottom level.
+        factors (list, optional):
+            The factors to use for the temporal levels.
+        top_fh (int, optional):
+            The top forecast horizon.
+        base_model (str, optional):
+            The base model to use.
+        base_model_params (dict, optional):
+            The parameters for the base model.
+        base_model_fit_params (dict, optional):
+            The fit parameters for the base model.
+        base_model_predict_params (dict, optional):
+            The predict parameters for the base model.
+        reconciliation_method (str, optional):
+            The reconciliation method to use.
+        holdout (bool, optional):
+            Whether to use holdout or not.
+        cv (int, optional):
+            The number of folds to use for holdout.
+
+
+    Methods:
+        fit:
+            Fits the model on the given dataframe.
+        predict:
+            Predicts the base forecasts
+        reconcile:
+            Reconciles the base forecasts.
+        get_residuals:
+            Gets the residuals for the base forecasts.
+
+
+
+
+
+
+
+
+
+    """
+
     def __init__(self, bottom_level_freq, factors=None, top_fh=1):
         # Ensure that either factors or bottom_freq is given
         # Raise an error otherwise
