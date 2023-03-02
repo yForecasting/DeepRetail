@@ -469,16 +469,43 @@ class THieF(object):
             Gets the residuals for the base forecasts.
 
 
+    Examples:
+        >>> from DeepRetail.reconciliation.temporal import THieF
 
+        >>> # Initialize THieF
+        >>> thief = thief = THieF(bottom_level_freq = bottom_level_freq)
 
+        >>> # Fit thief
+        >>> thief.fit(df, holdout = False, format = 'pivoted')
 
+        >>> # Predict base forecasts
+        >>> base_fc_df = thief.predict('ETS')
 
+        >>> # Get residuals
+        >>> residual_df = thief.base_forecast_residuals
 
-
+        >>> # Reconcile base forecasts
+        >>> reconciled_df = thief.reconcile('mse')
 
     """
 
     def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+        """
+        Initializes the THieF class.
+        It constructs the temporal levels and assigns fundemental parameters.
+        For example the summation matrix S.
+
+        Args:
+            bottom_level_freq (str):
+                The frequency of the bottom level.
+            factors (list, optional):
+                The factors to use for the temporal levels.
+            top_fh (int, optional):
+                The top forecast horizon.
+
+        Returns:
+            None
+        """
         # Ensure that either factors or bottom_freq is given
         # Raise an error otherwise
         if factors is None and bottom_level_freq is None:
@@ -516,6 +543,26 @@ class THieF(object):
         self.Smat = compute_matrix_S(self.factors)
 
     def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
+        """
+        Fits the model on the given dataframe.
+        The functions prepares the input dataframe to the right format.
+
+        Args:
+            original_df (pd.DataFrame):
+                The original dataframe.
+            holdout (bool, optional):
+                Whether to use holdout or not.
+            cv (int, optional):
+                The number of folds to use for holdout.
+            format (str, optional):
+                The format of the input dataframe.
+                It can be either 'pivoted' or 'transaction'.
+
+        Returns:
+            None
+
+        """
+
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
 
@@ -601,6 +648,24 @@ class THieF(object):
             }
 
     def predict(self, models, to_return=True):
+        """
+        Generates base forecasts for each temporal level
+
+        Args:
+            models (str or dict):
+                The models to use for each temporal level.
+                It can be either a string or a dictionary.
+                If it is a string, the same model will be used for all temporal levels.
+                If it is a dictionary, the keys should be the temporal levels and the values the models.
+            to_return (bool, optional):
+                Whether to return the base forecasts or not.
+                Default is True
+
+        Returns:
+            pd.DataFrame:
+                The base forecasts for each temporal level.
+        """
+
         # generates base forecasts
         # models is str or list dictionary for each factor
         # for example model_example = {1: ['ETS', 'Naive'], 3: 'ETS', 4: 'ARIMA', 6: 'ETS', 12: 'ETS'}
@@ -732,6 +797,16 @@ class THieF(object):
             return self.base_forecasts
 
     def get_residuals(self):
+        """
+        Estimates the residuals for each base forecaster on every temporal level.
+
+        Args:
+            None
+
+        Returns:
+            pd.DataFrame:
+                The residuals for each base forecaster on every temporal level.
+        """
         # Estimate residuals for all base forecasters
         temp_residuals = {
             factor: self.base_forecasters[factor].calculate_residuals()
@@ -757,6 +832,20 @@ class THieF(object):
         return temp_residuals[to_keep]
 
     def reconcile(self, reconciliation_method):
+        """
+        Reconciles base forecasts using the TemporalReconciler.
+
+        Args:
+            reconciliation_method (str):
+                The method to use for reconciliation.
+                Currently only supporting "struc".
+
+        Returns:
+            pd.DataFrame:
+                The reconciled forecasts.
+
+        """
+
         # Reconciles base predictions
         # Currently only supporting struc
 
