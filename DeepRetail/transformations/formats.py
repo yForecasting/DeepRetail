@@ -49,13 +49,16 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
         elif agg_func == "constant":
             pivot_df = pivot_df.resample(target_frequency, axis=1).last()
 
-    # Fills missing values
-    if fill_values:
-        pivot_df = pivot_df.reindex(
-            columns=pd.date_range(
-                pivot_df.columns.min(), pivot_df.columns.max(), freq=target_frequency
+        # Fills missing values
+        if fill_values:
+            pivot_df = pivot_df.reindex(
+                columns=pd.date_range(
+                    pivot_df.columns.min(),
+                    pivot_df.columns.max(),
+                    freq=target_frequency,
+                )
             )
-        )
+
     return pivot_df
 
 
