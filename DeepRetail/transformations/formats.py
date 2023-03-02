@@ -106,7 +106,7 @@ def sktime_forecast_format(df, format="transaction"):
     """Converts a dataframe to the format required by sktime for forecasting.
 
     Args:
-        df (pd.DataFrame): The dataframe in either pivot or transcation format
+        df (pd.DataFrame): The dataframe in either pivot or transaction format
         format (str, optional): The format. Defaults to 'transaction'. Options: 'transaction', 'pivot'.
 
     Returns:
@@ -128,7 +128,7 @@ def sktime_forecast_format(df, format="transaction"):
         # Drop the name on the columns
         df.columns.name = None
     else:
-        # Droping the name of the index
+        # Dropping the name of the index
         df.index.name = None
 
         # Transpose and rename

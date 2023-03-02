@@ -29,9 +29,9 @@ def get_factors(freq):
 
 def convert_offset_to_lower_freq(offset):
     """
-    Converts a pandas offset to its equivelant lower frequency
+    Converts a pandas offset to its equivalent lower frequency
     For example 12M to 1Y, 7D to 1W, 24H to 1D.
-    Convertions also take into account the number of periods.
+    Conversions also take into account the number of periods.
 
     Args:
         offset (str): The offset to convert
@@ -120,7 +120,7 @@ def convert_offset_to_lower_freq(offset):
 
 def compute_resampled_frequencies(factors, bottom_freq):
     """
-    Computes the resampled frequencies. It also converts to a lower equivelant frequency
+    Computes the resampled frequencies. It also converts to a lower equivalent frequency
     For example 12M to 1Y, 7D to 1W, 24H to 1D
 
     Args:
@@ -260,7 +260,7 @@ def reverse_order(out, frequencies):
 
 def get_w_matrix_structural(frequencies, total_ts):
     """
-    Get the W matrix for structural scalling
+    Get the W matrix for structural scaling
 
     Args:
         frequencies (list): a list of frequencies for the temporal levels
@@ -269,7 +269,7 @@ def get_w_matrix_structural(frequencies, total_ts):
     Returns:
         numpy.ndarray: a numpy array representing the W matrix
     """
-    # computes the reconciliation matrix for structural scalling
+    # computes the reconciliation matrix for structural scaling
 
     # Get the factors
     m = np.flip(frequencies)
@@ -318,7 +318,7 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     try:
         A_inv = np.linalg.inv(A)
     except np.linalg.LinAlgError:
-        # A fallaback in case the matrix is not invertible due to det = 0
+        # A fallback in case the matrix is not invertible due to det = 0
         # This is the pseudo inverse of A
         # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
         A_inv = np.linalg.pinv(A)
@@ -339,7 +339,7 @@ def compute_y_tilde(y_hat, Smat, Wmat):
 
 def get_w_matrix_mse(res_df):
     """
-    Get the W matrix for MSE scalling
+    Get the W matrix for MSE scaling
 
     Args:
         res_df (pandas.DataFrame): a pandas DataFrame containing the residuals
@@ -348,7 +348,7 @@ def get_w_matrix_mse(res_df):
         numpy.ndarray: a numpy array representing the W matrix
 
     """
-    # Get the unique_id for all time seris
+    # Get the unique_id for all time series
     unique_ts = res_df["unique_id"].unique()
 
     # Loop over the unique time series to construct unique W matrices

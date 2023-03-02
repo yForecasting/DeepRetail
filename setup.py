@@ -13,7 +13,7 @@ setuptools.setup(
     name='DeepRetail',
     license="GNU GPLv3",
     description='Forecasting package for retail using Deep Learning AI.',
-    version='v0.0.1',
+    version='v0.0.3',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/yForecasting/DeepRetail',

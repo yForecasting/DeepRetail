@@ -1,7 +1,8 @@
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import numpy as np
 
-# a small epsilon to avoid devisions with zero
+# a small epsilon to avoid divisions with zero
+# todo: check statistical correctness
 e = np.finfo(np.float64).eps
 
 
@@ -53,7 +54,7 @@ def scaled_error(actual, predicted, naive_mse=None, train=None, lag=1, *args, **
         np.array: The scaled error.
     """
 
-    # Scalling the error with the naive mse
+    # Scaling the error with the naive mse
 
     error = simple_error(actual, predicted, **kwargs)
     if naive_mse is not None:
@@ -162,7 +163,7 @@ def mape(actual, predicted, *args, **kwargs):
 
     """
 
-    # !!!!!!!Carefull!!!!!!
+    # !!!!!!!Careful!!!!!!
     # MAPE is biased as it is not symmetric
     # MAPE is not defined for actual = 0
     error = np.abs(percentage_error(actual, predicted))
@@ -210,7 +211,7 @@ def mase(actual, predicted, naive_mae, train=None, lag=1, *args, **kwargs):
     As proposed by "Another look at measures of forecast accuracy", Rob J Hyndman
 
     Either training data or the naive_mae should be given.
-    If training data is given computes the naive_mae internaly
+    If training data is given computes the naive_mae internally
 
     Args:
         actual (np.array): The actual values.
@@ -241,7 +242,7 @@ def rmsse(actual, predicted, naive_mse=None, train=None, lag=1, *args, **kwargs)
     The variant of MASE used as a metric in M5.
 
     Either training data or the naive_mse should be given.
-    If training data is given computes the naive_mse internaly
+    If training data is given computes the naive_mse internally
 
     Reference:
         https://github.com/alan-turing-institute/sktime/blob/main/sktime/performance_metrics/forecasting/_functions.py

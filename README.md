@@ -1,5 +1,5 @@
 # DeepRetail
-<img src="https://img.shields.io/badge/Maintained%20by-Vives%20AI%20Lab-red"> [![Downloads](https://static.pepy.tech/personalized-badge/DeepRetail?period=total&units=international_system&left_color=grey&right_color=blue&left_text=downloads)](https://pepy.tech/project/DeepRetail) <img src="https://img.shields.io/badge/python-v3.7%2B-blue"> <img src="https://img.shields.io/badge/pypi-v0.0.1-blue">
+<img src="https://img.shields.io/badge/Maintained%20by-Vives%20AI%20Lab-red"> [![Downloads](https://static.pepy.tech/personalized-badge/DeepRetail?period=total&units=international_system&left_color=grey&right_color=blue&left_text=downloads)](https://pepy.tech/project/DeepRetail) <img src="https://img.shields.io/badge/python-v3.7%2B-blue"> <img src="https://img.shields.io/badge/pypi-v0.0.3-blue">
 
 Python package on deep learning AI and machine learning for Retail
 
@@ -33,9 +33,42 @@ ___
 	 
 ### Use hierarchical modelling
 ```python
-from DeepRetail import hierarchical
+import pandas as pd
+from DeepRetail.transformations.formats import transaction_df
+from DeepRetail.forecasting.statistical import StatisticalForecaster
 
-# to do: explain functions
+# Load
+df = pd.read_csv('daily_data.csv', index_col=0)
+
+# Get a sample 
+sampled_df = df.sample(20)
+
+# Convert to transaction
+t_df = transaction_df(sampled_df)
+
+# Define the parameters
+freq = 'M'
+h = 4
+holdout = True
+cv = 2
+models = ['ETS', 'Naive']
+
+# Convert columns to datetime
+sampled_df.columns = pd.to_datetime(sampled_df.columns)
+
+# Resample columns to montly frequency
+sampled_df = sampled_df.resample('M', axis=1).sum()
+
+# Define the forecaster
+forecaster = StatisticalForecaster(models = models, freq = freq)
+
+# Fit the forecaster
+forecaster.fit(sampled_df, format = 'pivoted')
+
+# Predict
+forecast_df = forecaster.predict(h = h, cv = cv, holdout = holdout)
+forecast_df.head()
+
 ```
 
 ## Contributing
