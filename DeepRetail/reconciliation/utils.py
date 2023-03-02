@@ -259,6 +259,16 @@ def reverse_order(out, frequencies):
 
 
 def get_w_matrix_structural(frequencies, total_ts):
+    """
+    Get the W matrix for structural scalling
+
+    Args:
+        frequencies (list): a list of frequencies for the temporal levels
+        total_ts (int): the total number of time series
+
+    Returns:
+        numpy.ndarray: a numpy array representing the W matrix
+    """
     # computes the reconciliation matrix for structural scalling
 
     # Get the factors
@@ -283,6 +293,19 @@ def get_w_matrix_structural(frequencies, total_ts):
 
 
 def compute_y_tilde(y_hat, Smat, Wmat):
+    """
+    Compute the reconciled y_tilde through matrix multiplications
+    Have a fallback for the case where the matrix is not invertible.
+
+    Args:
+        y_hat (numpy.ndarray): a numpy array representing the predicted y
+        Smat (numpy.ndarray): a numpy array representing the summation matrix S
+        Wmat (numpy.ndarray): a numpy array representing the weight W matrix
+
+    Returns:
+        numpy.ndarray: a numpy array representing the reconciled y_tilde
+
+    """
     # Does matrix multiplication to compute y_tilde
 
     # The full format of the matrix is like that
@@ -315,6 +338,16 @@ def compute_y_tilde(y_hat, Smat, Wmat):
 
 
 def get_w_matrix_mse(res_df):
+    """
+    Get the W matrix for MSE scalling
+
+    Args:
+        res_df (pandas.DataFrame): a pandas DataFrame containing the residuals
+
+    Returns:
+        numpy.ndarray: a numpy array representing the W matrix
+
+    """
     # Get the unique_id for all time seris
     unique_ts = res_df["unique_id"].unique()
 
