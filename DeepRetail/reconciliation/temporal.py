@@ -15,7 +15,106 @@ import pandas as pd
 
 
 class TemporalReconciler(object):
+    """
+    A class for temporal reconciliation.
+    Reconciles base forecasts of different temporal levels.
+
+    Currently supports only structural and mse reconciliation.
+    Can handle simmulnteous reconciliation of multiple time series.
+    Is also extended to support cross validation.
+
+    Parameters
+    ----------
+    bottom_level_freq : str
+        The frequency of the bottom level forecasts.
+        Should be given if factors are not given.
+    factors : list, optional
+        The factors to use for the reconciliation.
+        Should be given if bottom_freq is not given.
+    top_fh : int, optional
+        The forecast horizon of the top level forecasts.
+        The default is 1.
+
+    Attributes
+    ----------
+    bottom_level_freq : str
+        The frequency of the bottom level forecasts.
+    bottom_level_numeric_freq : int
+        The numeric frequency of the bottom level forecasts.
+    factors : list
+        The factors to use for the reconciliation.
+    fhs : list
+        The forecast horizons of the forecasts.
+    frequencies : list
+        The frequencies of the forecasts.
+    m : list
+        The frequencies of the forecasts.
+    max_freq : int
+        The maximum frequency of the forecasts.
+    total_levels : int
+        The total number of levels.
+    Smat : numpy.ndarray
+        The matrix S.
+    base_fc_df : pandas.DataFrame
+        The base forecasts.
+    reconciliation_ready_df : pandas.DataFrame
+        The base forecasts in the format for reconciliation.
+    Wmat : numpy.ndarray
+        The matrix W with the reconciliation weights
+    reconciled_predictions : pandas.DataFrame
+        The reconciled predictions.
+
+    Methods
+    -------
+    get_reconciliation_format()
+        Converts the base forecasts to the format for reconciliation.
+    compute_matrix_W(reconciliation_method, residual_df=None)
+        Computes the matrix W.
+    get_reconciled_predictions()
+        Gets the reconciled predictions.
+
+    Examples
+    --------
+    >>> from DeepRetail.reconciliation.temporal import TemporalReconciler
+    >>> import pandas as pd
+
+    >>> # Create a reconciler
+    >>> temporal_reconciler = TemporalReconciler(bottom_level_freq = 'Q')
+
+    >>> # Create the base forecasts
+    >>> base_fc_df = pd.DataFrame({
+    ...     'unique_id': ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'],
+    ...     'temporal_level': [1, 2, 2, 4, 4, 4, 4],
+    ...     'fh': [1, 1, 2, 1, 2, 3, 4],
+    ...     'y': [20, 12, 11, 5, 3, 4, 2],
+    ...     'Model': ['Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1', 'Model1']
+    ... })
+
+    >>> # Fit the reconciler
+    >>> temporal_reconciler.fit(base_fc_df)
+
+    >>> # Reconcile
+    >>> reconciled = temporal_reconciler.reconcile('struc')
+    """
+
     def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+        """
+        Initializes the TemporalReconciler class.
+
+        Args:
+            bottom_level_freq (str): The frequency of the bottom level forecasts.
+                Should be given if factors are not given.
+            factors (list, optional): The factors to use for the reconciliation.
+                Should be given if bottom_freq is not given.
+            top_fh (int, optional): The forecast horizon of the top level forecasts.
+                The default is 1.
+
+        Raises:
+            TypeError: If neither factors nor bottom_freq is given.
+
+        Returns:
+            None
+        """
         # Ensure that either factors or bottom_freq is given
         # Raise an error otherwise
         if factors is None and bottom_level_freq is None:
@@ -44,6 +143,16 @@ class TemporalReconciler(object):
         self.Smat = compute_matrix_S(self.factors)
 
     def get_reconciliation_format(self):
+        """
+        Converts the base forecasts to the format for reconciliation.
+
+        Args:
+            None
+
+        Returns:
+            pandas.DataFrame: The base forecasts in the format for reconciliation.
+
+        """
         # Converts to the format for reconciliation
 
         temp_df = self.base_fc_df.copy()
@@ -79,6 +188,22 @@ class TemporalReconciler(object):
         return temp_df
 
     def compute_matrix_W(self, reconciliation_method, residual_df=None):
+        """
+        Computes the weight matrix W based on the reconciliation method given
+
+        Args:
+            reconciliation_method (str): The reconciliation method to use.
+                Should be one of "struc" or "mse".
+            residual_df (pandas.DataFrame, optional): The residuals of the base forecasts.
+                Should be given if reconciliation_method is "mse".
+
+        Raises:
+            ValueError: If reconciliation_method is "mse" and residual_df is not given.
+
+        Returns:
+            numpy.ndarray: The weight matrix W.
+
+        """
         # Computes the matrix W
 
         # For structural scalling
@@ -113,6 +238,15 @@ class TemporalReconciler(object):
         return Wmat
 
     def get_reconciled_predictions(self):
+        """
+        Reconciles base forecasts.
+
+        Args:
+            None
+
+        Returns:
+            pandas.DataFrame: The reconciled forecasts.
+        """
         # function to get the reconciliated predictions for every value on the df
 
         # First extract values from the dataframe
@@ -131,6 +265,15 @@ class TemporalReconciler(object):
         return reconcilded_df
 
     def reverse_reconciliation_format(self, reco_method):
+        """
+        Reverse the reconciliation format to the forecast format supported in DeepRetail.
+
+        Args:
+            reco_method (str): The reconciliation method used to reconcile the forecasts.
+
+        Returns:
+            pandas.DataFrame: The reconciled forecasts in the format supported in DeepRetail.
+        """
         # Function to reverse the reconciliation format to the original one
 
         temp_df = self.base_fc_df.copy()
@@ -179,6 +322,17 @@ class TemporalReconciler(object):
         return reco_df
 
     def fit(self, base_fc_df, holdout=False, cv=None):
+        """
+        Fits the reconciler on the given dataframe of base forecasts
+
+        Args:
+            base_fc_df (pandas.DataFrame): The dataframe of base forecasts.
+            holdout (bool, optional): Whether to use holdout or not.
+            cv (int, optional): The number of folds to use for holdout.
+
+        Returns:
+            None
+        """
         self.holdout = holdout
         self.cv = cv
 
@@ -207,6 +361,17 @@ class TemporalReconciler(object):
             self.reconciliation_ready_df = self.get_reconciliation_format()
 
     def reconcile(self, reconciliation_method, residual_df=None):
+        """
+        Reconciles the base forecasts.
+
+        Args:
+            reconciliation_method (str): The reconciliation method to use.
+            residual_df (pandas.DataFrame, optional): The dataframe of residuals.
+
+        Returns:
+            pandas.DataFrame: The reconciled forecasts.
+
+        """
         # reconciles
 
         # If we have a holdout
