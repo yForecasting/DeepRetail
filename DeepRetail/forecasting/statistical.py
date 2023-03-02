@@ -86,7 +86,7 @@ class StatisticalForecaster(object):
 
     """
 
-    def __init__(self, models, freq, n_jobs=-1, warning=False):
+    def __init__(self, models, freq, n_jobs=-1, warning=False, seasonal_length=None):
         """
         Initialize the StatisticalForecaster object.
 
@@ -99,10 +99,21 @@ class StatisticalForecaster(object):
                 The number of jobs to run in parallel for the fitting process.
             warning: bool, default=False
                 Whether to show warnings or not.
+            seasonal_length: int, default=None
+                The length of the seasonal pattern.
+                If None, the seasonal length is inferred from the frequency.
+                On frequencies with multiple seasonal patterns, the first seasonal pattern is used.
 
         """
         self.freq = freq
-        self.seasonal_length = get_numeric_frequency(freq)
+        if seasonal_length is not None:
+            self.seasonal_length = seasonal_length
+        else:
+            self.seasonal_length = get_numeric_frequency(freq)
+            # Check if it returns multiple seasonal lengths
+            if isinstance(self.seasonal_length, list):
+                # take the first
+                self.seasonal_length = self.seasonal_length[0]
         self.n_jobs = n_jobs
 
         # Set the warnings
@@ -164,7 +175,9 @@ class StatisticalForecaster(object):
         fc_df = sktime_forecast_format(fc_df)
 
         # Fix an issue with frequencies
-        fc_df = fc_df.asfreq(self.freq)
+        # turned off -> pay attention if it is needed
+        # -> moved it to the predict method
+        # fc_df = fc_df.asfreq(self.freq)
 
         # Add to the object
         self.fc_df = fc_df
@@ -192,12 +205,20 @@ class StatisticalForecaster(object):
         if not holdout and cv > 1:
             raise ValueError("Cannot do cross validation without holdout.")
 
+        # Add to the object
         self.fh = np.arange(1, h + 1, 1)
         self.cv = cv
+        self.h = h
+        self.holdout = holdout
+
+        total_test_size = h + cv - 1
 
         if holdout:
+            # add the frequency to the index for shifting
+            self.fc_df = self.fc_df.asfreq(self.freq)
+
             self.y_train, self.y_test = temporal_train_test_split(
-                self.fc_df, test_size=h
+                self.fc_df, test_size=total_test_size
             )
             # Convert y_test to the selected format
             self.y_test = pd.melt(
@@ -254,24 +275,39 @@ class StatisticalForecaster(object):
         model.fit(self.y_train)
 
         # get the prediction
-        y_pred = model.update_predict(self.fc_df, self.cross_validator)
+        if self.holdout:
+            # fit the model
+            y_pred = model.update_predict(self.fc_df, self.cross_validator)
+            # Convert to the right format
+            if self.h > 1:
+                y_pred = (
+                    y_pred.unstack()
+                    .unstack(level=1)
+                    .reset_index()
+                    .rename(columns={"level_0": "cutoff", "Period": "date"})
+                )
+                # Collapse
+                y_pred = pd.melt(
+                    y_pred,
+                    id_vars=["date", "cutoff"],
+                    value_vars=y_pred.columns[2:],
+                    value_name="y",
+                    var_name="unique_id",
+                )
+        else:
+            # fit the model
+            y_pred = model.predict(fh=self.fh)
+            # Convert to the right format
+            y_pred = (
+                y_pred.unstack()
+                .reset_index()
+                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y"})
+            )
+            # Add the last day as cutoff
+            y_pred["cutoff"] = self.fc_df.index.max()
 
-        # Convert to the right format
-        y_pred = (
-            y_pred.unstack()
-            .unstack(level=1)
-            .reset_index()
-            .rename(columns={"level_0": "cutoff", "Period": "date"})
-        )
-
-        # Collapse
-        y_pred = pd.melt(
-            y_pred,
-            id_vars=["date", "cutoff"],
-            value_vars=y_pred.columns[2:],
-            value_name="y",
-            var_name="unique_id",
-        )
+        # add the model name
+        y_pred["Model"] = name
 
         # add the model name
         y_pred["Model"] = name
@@ -289,79 +325,32 @@ class StatisticalForecaster(object):
         """
 
         # add the number of cv and fh
-        cv_vals = sorted(self.forecast_df["cutoff"].unique())
-        fh_vals = sorted(self.forecast_df["date"].unique())
+        if self.holdout:
+            cv_vals = sorted(self.forecast_df["cutoff"].unique())
+            fh_vals = sorted(self.forecast_df["date"].unique())
 
-        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
-        fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
+            cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+            fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
 
-        self.forecast_df["fh"] = [
-            fh_dict[date] for date in self.forecast_df["date"].values
-        ]
-        self.forecast_df["cv"] = [
-            cv_dict[date] for date in self.forecast_df["cutoff"].values
-        ]
-
-    def get_residuals(self):
-        """
-        Generates residuals for the fitted models.
-
-        Args:
-            None
-
-        Returns:
-            pandas.DataFrame
-                The residuals generated by the fitted models.
-
-        """
-
-        # For every model
-        for model in self.fitted_models:
-            # fit it for one step ahead
-            model.fit(self.y_train, fh=[1])
-
-        # Get the residuals
-        self.residuals = pd.concat(
-            [
-                self.calculate_residuals(model, name)
-                for model, name in zip(self.fitted_models, self.model_names)
+            self.forecast_df["fh"] = [
+                fh_dict[date] for date in self.forecast_df["date"].values
             ]
-        )
-        self.residuals = self.residuals.reset_index()
-        # return
-        return self.residuals
+            self.forecast_df["cv"] = [
+                cv_dict[date] for date in self.forecast_df["cutoff"].values
+            ]
+        else:
+            # get the forecasted dates
+            dates = self.forecast_df["date"].unique()
+            # get a dictionary of dates and their corresponding fh
+            fh_dict = dict(zip(dates, np.arange(1, len(dates) + 1)))
+            # add the fh
+            self.forecast_df["fh"] = [
+                fh_dict[date] for date in self.forecast_df["date"].values
+            ]
+            # also add the cv
+            self.forecast_df["cv"] = None
 
-    def calculate_residuals(self, model, name):
-        """
-        Calculates the residuals for a given model.
-
-        Args:
-            model : sktime.BaseForecaster
-                A sktime forecaster model to use for generating predictions.
-            name : str
-                The name of the model to use.
-
-        Returns:
-            pandas.DataFrame
-                The residuals generated by the given model.
-        """
-
-        # predict the residuals
-        residuals = model.predict_residuals(y=self.y_train)
-
-        # Melt
-        residuals = residuals.reset_index()
-        residuals = pd.melt(
-            residuals, id_vars=["Period"], value_name="residual", var_name="unique_id"
-        ).set_index(["unique_id", "Period"])
-
-        # Add the model name
-        residuals["Model"] = name
-
-        # return
-        return residuals
-
-    def residual_diagnosis(self, model, type, agg_func=None, n=None, index_ids=None):
+    def residual_diagnosis(self, model, type, agg_func=None, n=1, index_ids=None):
         """
         Plots the residuals for a given model together with the ACF plot and a histogram.
 
@@ -383,11 +372,17 @@ class StatisticalForecaster(object):
         """
 
         # Get residuals if we haven't already
-        if self.residuals is None:
-            self.get_residuals()
+        self.calculate_residuals()
 
         # filter residuals for the given model
         f_res = self.residuals[self.residuals["Model"] == model]
+
+        # Convert the df to the right format
+        # 1st: Keep only 1-step ahead residuals
+        f_res = f_res[f_res["fh"] == 1]
+        # 2nd: Drop columns and rename
+        to_keep = ["date", "unique_id", "residual", "Model"]
+        f_res = f_res[to_keep].rename(columns={"date": "Period"})
 
         # if we have to aggregate
         if type == "aggregate":
@@ -487,3 +482,124 @@ class StatisticalForecaster(object):
             ax3.set_facecolor((gray_scale, gray_scale, gray_scale))
 
             plt.show()
+
+    def compute_full_insample_forecasts(self, model, cv, name):
+        """
+        For every model estimates the residuals for all horizons.
+
+        Args:
+            model : sktime.BaseForecaster
+                A sktime forecaster model to use for generating predictions.
+            cv : sktime.BaseCrossValidator
+                A sktime cross-validator to use for generating predictions.
+            name : str
+                The name of the model to use.
+
+        Returns:
+            pandas.DataFrame
+                The residuals for all models and horizons.
+
+        """
+
+        res = model.update_predict(self.y_train, cv, update_params=False)
+
+        if self.h > 1:
+            # Convert to the right format
+            res = (
+                res.unstack()
+                .unstack(level=1)
+                .reset_index()
+                .rename(columns={"level_0": "cutoff", "Period": "date"})
+            )
+            res = pd.melt(
+                res,
+                id_vars=["date", "cutoff"],
+                value_vars=res.columns[2:],
+                value_name="y_pred",
+                var_name="unique_id",
+            )
+
+            # Drop NaNs
+            res = res.dropna(axis=0, subset=["y_pred"])
+
+            # Add the cv and the fh
+            cv_vals = sorted(res["cutoff"].unique())
+            cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+            res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
+
+            # Add the forecast horizon.
+            fh_vals = np.tile(self.fh, int(len(res) / self.h))
+            res["fh"] = fh_vals
+
+        else:
+            res = (
+                res.unstack()
+                .reset_index()
+                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y_pred"})
+            )
+
+            # add fh and cv
+            res["fh"] = 1
+            res["cv"] = 1
+
+            # Add the cutoff
+            cutoff_period = pd.date_range(
+                end=res["date"].values[-2].to_timestamp(),
+                periods=len(res["date"].unique()),
+                freq=self.freq,
+            )
+            res["cutoff"] = np.tile(cutoff_period, len(res["unique_id"].unique()))
+
+        # Add the model name
+        res["Model"] = name
+
+        return res
+
+    def calculate_residuals(self):
+        """
+        Calculate residuals for all horizons.
+
+        Args:
+            None
+
+        Returns:
+            pandas.DataFrame : The residuals for all models and horizons.
+
+        """
+
+        # Get the true dataframe
+        true_df = self.y_train.copy().reset_index()
+
+        # melt
+        true_df = pd.melt(
+            true_df,
+            id_vars="Period",
+            value_vars=true_df.columns,
+            value_name="y_true",
+            var_name="unique_id",
+        ).rename(columns={"Period": "date"})
+
+        # Define the new cross-validator
+        cross_validator = SlidingWindowSplitter(
+            window_length=self.seasonal_length, fh=self.fh, step_length=1
+        )
+
+        # Estiamte residuals for all models
+        res = pd.concat(
+            [
+                self.compute_full_insample_forecasts(model, cross_validator, name)
+                for model, name in zip(self.fitted_models, self.model_names)
+            ]
+        )
+
+        # Merge with the true values
+        res = pd.merge(res, true_df, on=["unique_id", "date"])
+
+        # Calculate the residual
+        res["residual"] = res["y_true"] - res["y_pred"]
+
+        # Add to the object
+        self.residuals = res
+
+        # Return
+        return res

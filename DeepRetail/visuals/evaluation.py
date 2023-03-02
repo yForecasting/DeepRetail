@@ -26,39 +26,55 @@ def plot_single_hist_boxplot(eval_df_temp, metrics, model):
 
     # Take the metrics
     metric_a, metric_b = metrics
-    metric_a_vals, metric_b_vals = eval_df_temp[metric_a].values, eval_df_temp[metric_b].values
+    metric_a_vals, metric_b_vals = (
+        eval_df_temp[metric_a].values,
+        eval_df_temp[metric_b].values,
+    )
 
     # Define axes
-    fig, axs = plt.subplots(2, 2, figsize=(12, 3), gridspec_kw={"height_ratios": (.25, .75)})
+    fig, axs = plt.subplots(
+        2, 2, figsize=(12, 3), gridspec_kw={"height_ratios": (0.25, 0.75)}
+    )
 
     # Plot boxplot and histogram for metric 1
     axs[1, 0].hist(metric_a_vals, bins=bins, color=color)
     axs[0, 0].boxplot(
-                    metric_a_vals, vert=False, widths=0.4, notch=True, patch_artist=True,
-                    boxprops=dict(facecolor=color, color=color))
+        metric_a_vals,
+        vert=False,
+        widths=0.4,
+        notch=True,
+        patch_artist=True,
+        boxprops=dict(facecolor=color, color=color),
+    )
     axs[0, 0].set_title(metric_a)
 
     # Edit subplot
     axs[0, 0].set_xticklabels([])  # remove x axis on the boxplot
     plt.subplots_adjust(hspace=0)  # Remove the gap between the subplots
-    axs[0, 0].spines['bottom'].set_visible(False)  # remove lines
-    axs[1, 0].spines['top'].set_visible(False)
+    axs[0, 0].spines["bottom"].set_visible(False)  # remove lines
+    axs[1, 0].spines["top"].set_visible(False)
 
     # Plot boxplot and histogram for metric 2
     axs[1, 1].hist(metric_b_vals, bins=bins, color=color)
-    axs[0, 1].boxplot(metric_b_vals, vert=False, widths=0.4, notch=True,
-                      patch_artist=True, boxprops=dict(facecolor=color, color=color))
+    axs[0, 1].boxplot(
+        metric_b_vals,
+        vert=False,
+        widths=0.4,
+        notch=True,
+        patch_artist=True,
+        boxprops=dict(facecolor=color, color=color),
+    )
     axs[0, 1].set_title(metric_b)
 
     # Edit subplot
     axs[0, 1].set_xticklabels([])  # remove x axis on the boxplot
     axs[0, 1].set_yticklabels([])  # remove y axis on the boxplot
     plt.subplots_adjust(hspace=0)  # Remove the gap between the subplots
-    axs[0, 1].spines['bottom'].set_visible(False)  # remove lines
-    axs[1, 1].spines['top'].set_visible(False)
+    axs[0, 1].spines["bottom"].set_visible(False)  # remove lines
+    axs[1, 1].spines["top"].set_visible(False)
 
     # A single title for the whole figure
-    fig.suptitle(f'{model}: Distribution of {metric_a} and {metric_b}')
+    fig.suptitle(f"{model}: Distribution of {metric_a} and {metric_b}")
 
     # Add the grid for y axis only
     axs[1, 0].yaxis.grid(True)
@@ -98,7 +114,6 @@ def plot_box(evaluation_df, metrics, fliers=True):
 
     plt.figure(figsize=(14, 8))
     for i, met in enumerate(metric_names, start=1):
-
         # Define subplot
         plt.subplot(rows, cols, i)
 
@@ -154,7 +169,6 @@ def plot_line(evaluation_df, metrics):
     flat_axes = axes.flatten()[:total_mets]
 
     for i, ax in enumerate(flat_axes):
-
         # Define the current metric
         met = metric_names[i]
 
@@ -188,7 +202,9 @@ def plot_line(evaluation_df, metrics):
     plt.show()
 
 
-def visualize_forecasts(n, h, cv, freq, original_df, forecast_df, models, show_in_sample):
+def visualize_forecasts(
+    n, h, cv, freq, original_df, forecast_df, models, show_in_sample
+):
     """
     Visualize the forecasts for the given models.
     If defined, plots the in-samples values too.
@@ -227,7 +243,7 @@ def visualize_forecasts(n, h, cv, freq, original_df, forecast_df, models, show_i
 
             if show_in_sample:
                 # plot the in_sample values
-                y.plot(ax=ax, label='y')
+                y.plot(ax=ax, label="y")
                 # Line to seperate train/test
                 plt.axvline(x=end_date, color="black", linestyle="--")
                 plt.axvspan(xmin=end_date, xmax=dates[-1], color="darkgray")
@@ -235,10 +251,10 @@ def visualize_forecasts(n, h, cv, freq, original_df, forecast_df, models, show_i
             # Plot predictions
             for model in models:
                 # Filter values
-                temp_fc_df = forecast_df[forecast_df['Model'] == model]
+                temp_fc_df = forecast_df[forecast_df["Model"] == model]
 
                 # Currently only plots for the last cv!
-                temp_fc_df_fold = temp_fc_df[temp_fc_df['cv'] == cv]
+                temp_fc_df_fold = temp_fc_df[temp_fc_df["cv"] == cv]
                 # pivot the values and take the series to show
                 temp_vals = pivoted_df(temp_fc_df_fold, freq).loc[series_name].values
 
