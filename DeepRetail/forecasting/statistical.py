@@ -259,7 +259,7 @@ class StatisticalForecaster(object):
 
     def get_model_predictions(self, model, name):
         """
-        Fits a given skktime model and generates predictions.
+        Fits a given sktime model and generates predictions.
 
         Args:
             model : sktime.BaseForecaster
@@ -584,7 +584,7 @@ class StatisticalForecaster(object):
             window_length=self.seasonal_length, fh=self.fh, step_length=1
         )
 
-        # Estiamte residuals for all models
+        # Estimate residuals for all models
         res = pd.concat(
             [
                 self.compute_full_insample_forecasts(model, cross_validator, name)

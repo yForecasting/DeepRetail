@@ -32,7 +32,7 @@ def calculate_group_scores(group, metrics):
     # Get the names of the metrics
     metric_names = [metric.__name__ for metric in metrics]
 
-    # Sequantily append to dictionary
+    # Sequentially append to dictionary
     scores_dict = dict()
     for name, metric in zip(metric_names, metrics):
         scores_dict[name] = metric(
@@ -194,7 +194,7 @@ class Evaluator(object):
     ):
         """
         Plots the error distribution for the given metrics.
-            Default and recomeneded metrics are rmsse and scaled_error.
+            Default and recommended metrics are rmsse and scaled_error.
 
         Args:
             metrics (list): A list of metrics to be calculated for each group.
@@ -239,11 +239,11 @@ class Evaluator(object):
             group_scores_by: The grouping for the evaluation.
                 Used only on the boxplot. Line plot uses specific grouping.
                 Default and recommended is the total evaluation.
-            fliers: Wheater to include fliers or not on the boxplot.
+            fliers: Whether to include fliers or not on the boxplot.
         """
 
         if type == "boxplot":
-            # Evalute on the given metrics
+            # Evaluate on the given metrics
             evaluation_df = self.evaluate(metrics, group_scores_by)
             # plot
             plot_box(evaluation_df, metrics, fliers=True)
@@ -266,7 +266,7 @@ class Evaluator(object):
             n (int): The number of samples to plot.
             models (list): A list of models to plot.
                         Default is 'all' which plots all models.
-            show_in_sample (bool): Wheater to show the in-sample data or not.
+            show_in_sample (bool): Whether to show the in-sample data or not.
                         Default is True.
             group_scores_by (list): A list of columns to group the predictions by.
         """

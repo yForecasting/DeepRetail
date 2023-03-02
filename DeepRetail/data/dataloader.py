@@ -6,7 +6,7 @@ from DeepRetail.data.casereaders import read_case_0
 class Reader(object):
     """
     Reads data of different formats from the provided filepath.
-    Converts data into a universal format used throught the package.
+    Converts data into a universal format used through the package.
 
     """
 

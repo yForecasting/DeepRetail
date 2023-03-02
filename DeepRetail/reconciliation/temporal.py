@@ -245,9 +245,9 @@ class TemporalReconciler(object):
         ]
 
         # Convert to dataframe
-        reconcilded_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
+        reconciled_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
 
-        return reconcilded_df
+        return reconciled_df
 
     def reverse_reconciliation_format(self, reco_method):
         """
@@ -329,7 +329,7 @@ class TemporalReconciler(object):
             # Keep this one to filter later
             self.original_df = base_fc_df.copy()
 
-            # Itterate over the folds
+            # Iterate over the folds
             for k in range(self.cv):
                 # Filter on the cv
                 self.base_fc_df = self.original_df[self.original_df["cv"] == k + 1]
@@ -364,7 +364,7 @@ class TemporalReconciler(object):
             # Initialize a list for the each fold
             reconciled_df_list = []
 
-            # Itterate over folds
+            # Iterate over folds
             for k in range(self.cv):
                 # Filter on the fold
                 self.base_fc_df = self.original_df[self.original_df["cv"] == k + 1]
@@ -492,7 +492,7 @@ class THieF(object):
     def __init__(self, bottom_level_freq, factors=None, top_fh=1):
         """
         Initializes the THieF class.
-        It constructs the temporal levels and assigns fundemental parameters.
+        It constructs the temporal levels and assigns fundamental parameters.
         For example the summation matrix S.
 
         Args:
@@ -576,7 +576,7 @@ class THieF(object):
 
             end_point = self.bottom_level_numeric_freq + self.cv - 1
 
-            # Initialie lists for train and test
+            # Initialize lists for train and test
             self.resampled_train_dfs = []
             self.resampled_test_dfs = []
 
@@ -717,7 +717,7 @@ class THieF(object):
                 self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
 
                 # Reset index and drop column from multi-index
-                # also rename the remaining idnex to get the temporal level
+                # also rename the remaining index to get the temporal level
                 self.base_forecasts = (
                     self.base_forecasts.reset_index()
                     .drop(columns="level_1")
@@ -754,9 +754,9 @@ class THieF(object):
             if to_return:
                 return self.base_forecasts
 
-        # If we dont have holdout
+        # If we don't have holdout
         else:
-            # Initiaze a StatisticalForecaster for each factor
+            # Initialize a StatisticalForecaster for each factor
             # Currently only supporting StatisticalForecaster
             self.base_forecasters = {
                 factor: StatisticalForecaster(
