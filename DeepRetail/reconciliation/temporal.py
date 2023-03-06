@@ -3,7 +3,7 @@ from DeepRetail.forecasting.statistical import StatisticalForecaster
 from DeepRetail.reconciliation.utils import (
     get_factors,
     compute_resampled_frequencies,
-    compute_matrix_S,
+    compute_matrix_S_temporal,
     resample_temporal_level,
     reverse_order,
     get_w_matrix_structural,
@@ -125,7 +125,7 @@ class TemporalReconciler(object):
         self.total_levels = len(self.factors)
 
         # Construct the Smat
-        self.Smat = compute_matrix_S(self.factors)
+        self.Smat = compute_matrix_S_temporal(self.factors)
 
     def get_reconciliation_format(self):
         """
@@ -540,7 +540,7 @@ class THieF(object):
         )
 
         # Construct the Smat
-        self.Smat = compute_matrix_S(self.factors)
+        self.Smat = compute_matrix_S_temporal(self.factors)
 
     def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
         """
