@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Debug noteboks
+debug_notebooks
+
+# The data folder
+.data
