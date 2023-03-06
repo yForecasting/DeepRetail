@@ -139,9 +139,9 @@ def compute_resampled_frequencies(factors, bottom_freq):
     return resample_factors
 
 
-def compute_matrix_S(factors):
+def compute_matrix_S_temporal(factors):
     """
-    Computes the summation matrix s
+    Computes the summation matrix S for temporal levels
 
     Args:
         factors (list): a list of factors for the temporal levels
