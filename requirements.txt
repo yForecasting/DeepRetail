@@ -7,7 +7,6 @@ contourpy==1.0.7
 cycler==0.11.0
 debugpy==1.6.6
 decorator==5.1.1
--e git+https://github.com/FilTheo/DeepRetail.git@26eb8d762aeb1891af21abc238bc559809f6e748#egg=DeepRetail
 Deprecated==1.2.13
 executing==1.2.0
 fonttools==4.38.0
