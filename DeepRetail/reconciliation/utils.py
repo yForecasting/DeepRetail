@@ -166,7 +166,9 @@ def compute_matrix_S_temporal(factors):
         # loop through the frequencies
         for i in range(max_freq // factors[k]):
             # populate the S_thief matrix
-            S_thief[k][i, factors[k] * i : factors[k] + factors[k] * i] = 1  # noqa: E203
+            S_thief[k][
+                i, factors[k] * i : factors[k] + factors[k] * i  # noqa: E203
+            ] = 1
 
     # reverse the order of the stacked levels
     S_thief = S_thief[::-1]
