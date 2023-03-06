@@ -227,3 +227,56 @@ def extract_hierarchical_structure(
         df.loc[:, cols[i]] = df.loc[:, cols[i + 1]] + "_" + df.loc[:, cols[i]]
 
     return df
+
+
+def build_cross_sectional_df(df, hierarchical_df, format="pivoted"):
+    """
+    Extends a dataframe to include all hierarchical levels.
+    Performs aggregations given the hierarchical dataframe.
+
+    Args:
+        df (pd.DataFrame): The original dataframe
+        hierarchical_df (pd.DataFrame): A dataframe with the hierarchical structure.
+            Its generated using the extract_hierarchical_structure function.
+
+    Returns:
+        pd.DataFrame: A new pivoted df that includes new time series for every hierarchical level.
+
+    """
+
+    # Convert to the right format
+    if format == "pivoted":
+        # Convert to transaction format
+        df = transaction_df(df)
+    elif format == "transaction":
+        pass
+    else:
+        raise ValueError("Format not recognized")
+
+    # Take the levels
+    levels = hierarchical_df.columns
+
+    # Merge with the hierarchical_df
+    df = df.merge(hierarchical_df, left_on="unique_id", right_index=True, how="left")
+
+    # Initialize a dataframe
+    new_pivoted_df = pd.DataFrame()
+
+    # Initialize the names of the columns
+    new_cols = ["unique_id", "date", "y"]
+
+    # Itterate over the levels
+    for level in levels:
+        # Groupby the level and sum
+        temp_level = df.groupby([level, "date"]).agg({"y": "sum"}).reset_index()
+
+        # Change the columns
+        temp_level.columns = new_cols
+
+        # pivot
+        temp_level = pivoted_df(temp_level)
+
+        # Concat with the new pivoted df
+        new_pivoted_df = pd.concat([new_pivoted_df, temp_level], axis=0)
+
+    return new_pivoted_df
