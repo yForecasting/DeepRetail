@@ -136,3 +136,94 @@ def sktime_forecast_format(df, format="transaction"):
         df.index.names = ["Period"]
 
     return df
+
+
+def extract_hierarchical_structure(
+    df, current_format, correct_format, splitter, add_total=True, format="transaction"
+):
+    """
+    Extract the hierarchical structure from the unique id of a dataframe.
+    Returns a new dataframe with the hierarchical structure as columns.
+
+    Args:
+        df (pd.DataFrame): The dataframe with the unique_id column.
+        current_format (list): Current names of the hierarchical levels in the unique_id
+        correct_format (list): Names of the hierarchical levels on their correct order.
+            Bottom levels are first, later levels last.
+        splitter (str): The splitter used to split the unique_id column.
+        add_total (bool): Whether or not to add a column for the total hiearhical level.
+            Default is True and the name is "T".
+        format (str): The format of the dataframe.
+            Default is 'transaction'. Accepts transaction and pivoted.
+
+    Returns:
+        pd.DataFrame: The dataframe with the hierarchical structure as columns.
+
+    Examples:
+        >>> df = pd.DataFrame({'date': ['2022-01-01', '2022-01-02', '2022-01-03', '2022-01-01', '2022-01-02',
+                            '2022-01-03'],
+        ...                    'y': [1, 2, 3, 4, 5, 6],
+        ...                    'unique_id': ['Hobbies_001_CA_1', 'Food_003_LA_1',
+                        'Hobbies_002_CA_2', 'Food_002_CA_1', 'Food_001_LA_1', 'Hobbies_005_CA_2']})
+        >>> extract_hierarchical_structure(df,
+                                        ['category','item_num, 'state', 'store'],
+                                        ['item_num', 'category', 'store', 'state'],
+                                        '_',
+                                        rue)
+
+                                item_num            category         store     state total
+        Hobbies_001_CA_1      T_CA_1_Hobbies_001  T_CA_1_Hobbies     T_CA_1    T_CA    T
+        Food_003_LA_1         T_LA_1_Food_003     T_LA_1_Food        T_LA_1    T_LA    T
+        Hobbies_002_CA_2      T_CA_2_Hobbies_002  T_CA_2_Hobbies     T_CA_2    T_CA    T
+        Food_002_CA_1         T_CA_1_Food_001     T_CA_1_Food        T_CA_1    T_CA    T
+        Food_001_LA_1         T_LA_1_Food_001     T_LA_1_Food        T_LA_1    T_LA    T
+        Hobbies_005_CA_2      T_CA_2_Hobbies_005  T_CA_2_Hobbies     T_CA_2    T_CA    T
+
+    """
+
+    # Convert to the right format
+    if format == "pivoted":
+        # Convert to transaction format
+        df = transaction_df(df)
+    elif format == "transaction":
+        pass
+    else:
+        raise ValueError("Format not recognized")
+
+    # Drop duplicates on unique_id
+    df = df.drop_duplicates(subset=["unique_id"])
+
+    # drop the date and the y columns
+    # We focus only on the format
+    df = df.drop(columns=["date", "y"])
+
+    # Split the unique_id column on the splitter
+    df["temp"] = df["unique_id"].str.split(splitter)
+
+    # set as index the unique_id
+    df = df.set_index("unique_id")
+
+    # Create a new column for every item on the list of the temp column
+    df = df.join(pd.DataFrame(df["temp"].tolist(), index=df.index)).drop(
+        columns=["temp"]
+    )
+
+    # Rename the columns based on the current format
+    df.columns = current_format
+
+    # Reorder the columns based on the correct format
+    df = df[correct_format]
+
+    # Step 8:
+    # If total is True, add a total column
+    if add_total:
+        df["total"] = "T"
+
+    # Starting from the end, for each column add the previous column as a sufix
+    cols = df.columns
+
+    # Itterate over the reversed columns and skipping the column with the total
+    for i in range(len(df.columns) - 2, -1, -1):
+        df.loc[:, cols[i]] = df.loc[:, cols[i + 1]] + "_" + df.loc[:, cols[i]]
+
+    return df
