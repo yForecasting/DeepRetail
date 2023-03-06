@@ -380,3 +380,43 @@ def get_w_matrix_mse(res_df):
             W_inv = np.concatenate((W_inv, temp_W[np.newaxis, :, :]), axis=0)
 
     return W_inv
+
+
+def compute_matrix_S_crosssectional(df):
+    """
+    Estimates the S matrix for cross-sectional reconcliation.
+
+    Args:
+        df (pandas.DataFrame): a pandas DataFrame with the hierarchical structure.
+            Note: Generated using the extract_hierarchical_structure function.
+
+    Returns:
+        pandas.DataFrame: a pandas DataFrame representing the S matrix.
+
+    """
+
+    # Switch the index with the lowest level of the hierarchy
+    # Take the new index
+    new_index = df.columns[0]
+    df = df.reset_index(drop=True).set_index(df[new_index].copy())
+
+    # Get the total levels -> the column names
+    # But reversed -> start from the top to the bottom
+    total_levels = df.columns.values[::-1]
+
+    # Initialize a dataframe to concat the S matrix
+    S = pd.DataFrame()
+
+    # Itterate over column names and stack them to create the S matrix
+    for level in total_levels:
+        # Get dummies and transpose
+        temp_level = pd.get_dummies(df[level]).T
+
+        # Concat with the S mat
+        S = pd.concat([S, temp_level], axis=0)
+
+    # Sort columns on S
+    # This is the most time consuming step
+    S = S.sort_index(axis=1)
+
+    return S
