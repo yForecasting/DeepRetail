@@ -28,6 +28,7 @@ setuptools.setup(
         'sktime==0.16.1',
         'scikit-learn==1.2.1',
         'statsforecast==1.4.0',
+        'numba==0.56.4'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
