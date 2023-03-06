@@ -382,7 +382,7 @@ def get_w_matrix_mse(res_df):
     return W_inv
 
 
-def compute_matrix_S_crosssectional(df):
+def compute_matrix_S_cross_sectional(df):
     """
     Estimates the S matrix for cross-sectional reconcliation.
 
