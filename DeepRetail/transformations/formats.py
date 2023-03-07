@@ -138,6 +138,41 @@ def sktime_forecast_format(df, format="transaction"):
     return df
 
 
+def statsforecast_forecast_format(df, format="transaction"):
+    """
+    Converts a dataframe to the format required for forecasting with statsforecast.
+
+    Args:
+        df : pd.DataFrame
+            The input data.
+        format : str, default='transaction'
+            The format of the input data. Can be 'transaction' or 'pivotted'.
+
+    Returns:
+        df : pd.DataFrame
+            The formatted dataframe.
+
+    """
+
+    # if we have transaction
+    if format == "transaction":
+        # just rename the date column to ds
+        df = df.rename(columns={"date": "ds"})
+    elif format == "pivotted":
+        # if we have pivotted
+        # we need to convert it to transaction
+        df = transaction_df(df, drop_zeros=False)
+        # and rename the date column to ds
+        df = df.rename(columns={"date": "ds"})
+    else:
+        raise ValueError(
+            "Provide the dataframe either in pivoted or transactional format."
+        )
+
+    # Return
+    return df
+
+
 def extract_hierarchical_structure(
     df, current_format, correct_format, splitter, add_total=True, format="transaction"
 ):
