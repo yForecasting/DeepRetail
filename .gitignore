@@ -132,4 +132,4 @@ dmypy.json
 debug_notebooks
 
 # The data folder
-.data
+DeepRetail/data/data_folder/
