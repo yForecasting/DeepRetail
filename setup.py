@@ -25,9 +25,8 @@ setuptools.setup(
         'pandas==1.5.3',
         'matplotlib==3.2.2',
         'numpy==1.23.5',
-        'sktime==0.16.1',
         'scikit-learn==1.2.1',
-        'statsforecast==1.4.0',
+        'statsforecast==1.5.0',
         'numba==0.56.4'
     ],
     classifiers=[
