@@ -1,14 +1,12 @@
 import numpy as np
 import pandas as pd
 from DeepRetail.forecasting.utils import get_numeric_frequency
-from DeepRetail.transformations.formats import sktime_forecast_format, transaction_df
-from sktime.forecasting.model_selection import (
-    SlidingWindowSplitter,
-    temporal_train_test_split,
+from DeepRetail.transformations.formats import (
+    transaction_df,
+    statsforecast_forecast_format,
 )
-from sktime.forecasting.ets import AutoETS
-from sktime.forecasting.naive import NaiveForecaster
-from sktime.forecasting.statsforecast import StatsForecastAutoARIMA
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, AutoARIMA, Naive, SeasonalNaive
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -20,51 +18,58 @@ class StatisticalForecaster(object):
     """
     A class for time series forecasting using statistical methods.
 
-    Parameters:
-        models : list
-            A list of model names to use for forecasting.
-            Currently only 'Naive', 'SNaive', 'ARIMA' and 'ETS' are supported.
-        freq : str
-            The frequency of the time series data.
-        n_jobs : int, optional (default=-1)
-            The number of parallel jobs to run during model fitting.
+    Methods:
+        __init__(models, freq, n_jobs=-1, warning=False, seasonal_length=None)
+            Initialize the StatisticalForecaster object.
+        fit(df, format="pivoted", fallback=True, verbose=False)
+            Fit the model to given the data.
+        predict(h, cv=1, step_size=1, refit=True, holdout=True)
+            Generates predictions using the statistical forecaster.
+        calculate_residuals()
+            Calculates the residuals of the model.
+        residuals_diagnosis(model = 'ETS', type = 'random', n = 3)
+            Plots diagnosis for the residuals
+        add_fh_cv()
+            Adds the forecast horizon and cross-validation to the predictions.
 
     Args:
-        freq : str
-            The frequency of the data.
-        seasonal_length : int
-            The length of the seasonal pattern.
-        n_jobs : int
+        models: list
+            A list of models to fit.
+        freq: str
+            The frequency of the data, e.g. 'D' for daily or 'M' for monthly.
+        n_jobs: int, default=-1
             The number of jobs to run in parallel for the fitting process.
-        fitted_models : list
-            A list of models that have been fitted.
-        model_names : list
-            A list of the names of the models that have been fitted.
-        fc_df : pd.DataFrame
-            The formatted forecast dataframe.
-        fh : np.ndarray
+        warning: bool, default=False
+            Whether to show warnings or not.
+        seasonal_length: int, default=None
+            The length of the seasonal pattern.
+            If not given, it is inferred from the frequency.
+        df: pd.DataFrame
+            The input data.
+        format: str, default='pivoted'
+            The format of the input data.
+            Can be 'pivoted' or 'transactional'.
+        fallback: bool, default=True
+            Whether to fallback to the default model if the model fails to fit.
+            Default selection is Naive
+        verbose: bool, default=False
+            Whether to show the progress of the model fitting.
+        h: int
             The forecast horizon.
-        cv : int
-            The number of cross-validation folds.
-        y_train : pd.DataFrame
-            The training data.
-        y_test : pd.DataFrame
-            The test data.
-        cross_validator : SlidingWindowSplitter
-            The cross-validation object.
-        forecast_df : pd.DataFrame
-            The forecast dataframe, including predicted values and any available true values.
-
-    Methods:
-        fit(df, format='pivoted')
-            Fits the models to the time series data.
-        predict(h, cv=1, holdout=True)
-            Generates forecasts for a future period.
-        get_model_predictions(model, name)
-            Generates forecasts for a future period using a specific model.
-        add_fh_cv()
-            Adds the forecasting horizon and cross-validation fold numbers to the forecast DataFrame.
-
+        cv: int, default=1
+            The number of cross-validations to perform.
+        step_size: int, default=1
+            The step size for the cross-validation.
+        refit: bool, default=True
+            Whether to refit the model on the entire data after cross-validation.
+        holdout: bool, default=True
+            Whether to hold out the last observation for cross-validation.
+        model: str, default='ETS'
+            The model to plot the residuals for.
+        type: str, default='random'
+            The type of residuals to plot. Can be 'random', aggregate, individual.
+        n: int, default=3
+            The number of residuals to plot.
 
     Examples:
         # Create the forecaster
@@ -126,28 +131,22 @@ class StatisticalForecaster(object):
 
         # Append to the list
         if "Naive" in models:
-            models_to_fit.append(NaiveForecaster(strategy="last"))
+            models_to_fit.append(Naive())
             model_names.append("Naive")
         if "SNaive" in models:
-            models_to_fit.append(
-                NaiveForecaster(strategy="last", sp=self.seasonal_length)
-            )
+            models_to_fit.append(SeasonalNaive(season_length=self.seasonal_length))
             model_names.append("Seasonal Naive")
         if "ARIMA" in models:
-            models_to_fit.append(
-                StatsForecastAutoARIMA(sp=self.seasonal_length, n_jobs=self.n_jobs)
-            )
+            models_to_fit.append(AutoARIMA(season_length=self.seasonal_length))
             model_names.append("ARIMA")
         if "ETS" in models:
-            models_to_fit.append(
-                AutoETS(auto=True, sp=self.seasonal_length, n_jobs=self.n_jobs)
-            )
+            models_to_fit.append(AutoETS(season_length=self.seasonal_length))
             model_names.append("ETS")
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
 
-    def fit(self, df, format="pivoted"):
+    def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
         Fit the model to given the data.
 
@@ -156,7 +155,11 @@ class StatisticalForecaster(object):
                 The input data.
             format : str, default='pivoted'
                 The format of the input data. Can be 'pivoted' or 'transactional'.
-
+            fallback : bool, default=True
+                Whether to fallback to the default model if the model fails to fit.
+                Default selection is Naive
+            verbose : bool, default=False
+                Whether to show the progress of the model fitting.
         Raises:
             ValueError : If the format is not 'pivoted' or 'transactional'.
 
@@ -172,17 +175,31 @@ class StatisticalForecaster(object):
             )
 
         # convert to the right format for forecasting
-        fc_df = sktime_forecast_format(fc_df)
+        fc_df = statsforecast_forecast_format(fc_df)
 
-        # Fix an issue with frequencies
-        # turned off -> pay attention if it is needed
-        # -> moved it to the predict method
-        # fc_df = fc_df.asfreq(self.freq)
+        # Define the StatsForecaster
+        if fallback:
+            self.forecaster = StatsForecast(
+                df=fc_df,
+                models=self.fitted_models,
+                freq=self.freq,
+                n_jobs=self.n_jobs,
+                fallback_model=Naive(),
+                verbose=verbose,
+            )
+        else:
+            self.forecaster = StatsForecast(
+                df=fc_df,
+                models=self.fitted_models,
+                freq=self.freq,
+                n_jobs=self.n_jobs,
+                verbose=verbose,
+            )
 
         # Add to the object
         self.fc_df = fc_df
 
-    def predict(self, h, cv=1, holdout=True):
+    def predict(self, h, cv=1, step_size=1, refit=True, holdout=True):
         """
         Generates predictions using the statistical forecaster.
 
@@ -191,6 +208,10 @@ class StatisticalForecaster(object):
                 The forecast horizon (i.e., how many time periods to forecast into the future).
             cv : int, optional (default=1)
                 The number of cross-validation folds to use. If set to 1, no cross-validation is performed.
+            step_size : int, optional (default=1)
+                The step size to use for cross-validation. If set to 1, the cross-validation folds are non-overlapping
+            refit : bool, optional (default=True)
+                Weather to refit the model at each cross-validation. Avoid for big datasets.
             holdout : bool, optional (default=True)
                 If True, a holdout set is used for testing the model. If False, the model is fit on the entire data.
 
@@ -205,129 +226,57 @@ class StatisticalForecaster(object):
         if not holdout and cv > 1:
             raise ValueError("Cannot do cross validation without holdout.")
 
+        if holdout and cv is None:
+            cv = 1
+
         # Add to the object
-        self.fh = np.arange(1, h + 1, 1)
         self.cv = cv
         self.h = h
         self.holdout = holdout
-
-        total_test_size = h + cv - 1
+        self.step_size = step_size
+        self.refit = refit
 
         if holdout:
-            # add the frequency to the index for shifting
-            self.fc_df = self.fc_df.asfreq(self.freq)
-
-            self.y_train, self.y_test = temporal_train_test_split(
-                self.fc_df, test_size=total_test_size
+            # Get the cross_validation
+            y_pred = self.forecaster.cross_validation(
+                df=self.fc_df,
+                h=self.h,
+                step_size=self.step_size,
+                n_windows=self.cv,
+                refit=self.refit,
             )
-            # Convert y_test to the selected format
-            self.y_test = pd.melt(
-                self.y_test.reset_index(),
-                id_vars=["Period"],
-                value_vars=self.y_test.columns,
-                value_name="True",
-                var_name="unique_id",
-            ).rename(columns={"Period": "date"})
-        else:
-            self.y_train = self.fc_df.copy()
-            self.y_test = None
 
-        self.cross_validator = SlidingWindowSplitter(
-            window_length=len(self.fc_df) - h - (self.cv - 1), fh=self.fh, step_length=1
-        )
-
-        # Get the predictions
-        y_pred = pd.concat(
-            [
-                self.get_model_predictions(model, name)
-                for model, name in zip(self.fitted_models, self.model_names)
-            ]
-        )
-
-        # if we have holdout add the true values
-        if self.y_test is not None:
-            self.forecast_df = pd.merge(y_pred, self.y_test, on=["unique_id", "date"])
+            # edit the format
+            # Reset index and rename
+            y_pred = y_pred.reset_index().rename(columns={"ds": "date", "y": "True"})
+            # Melt
+            y_pred = pd.melt(
+                y_pred,
+                id_vars=["unique_id", "date", "cutoff", "True"],
+                var_name="Model",
+                value_name="y",
+            )
 
         else:
-            self.forecast_df = y_pred.copy()
+            # We just forecast
+            y_pred = self.forecaster.forecast(df=self.fc_df, h=self.h)
+
+            # edit the format
+            # Reset index and rename
+            y_pred = y_pred.reset_index().rename(columns={"ds": "date"})
+            # Melt
+            y_pred = pd.melt(
+                y_pred, id_vars=["unique_id", "date"], var_name="Model", value_name="y"
+            )
+
+        # Add to the object
+        self.forecast_df = y_pred
 
         # add the fh and cv
         self.add_fh_cv()
 
         # return
         return self.forecast_df
-
-    def get_model_predictions(self, model, name):
-        """
-        Fits a given sktime model and generates predictions.
-
-        Args:
-            model : sktime.BaseForecaster
-                A sktime forecaster model to use for generating predictions.
-            name : str
-                The name of the model to use.
-
-        Returns:
-            pandas.DataFrame
-                The predictions generated by the given model.
-        """
-        # fit the model
-
-        # add a fallback for ets
-        # Maybe I should generalize for other models
-        # and set the fallback to Naive maybe
-        if name == "ETS":
-            try:
-                model.fit(self.y_train)
-            except ValueError:
-                # fallback to SES
-                print("Fallback to SES for ETS model")
-                model = AutoETS(auto=False, sp=self.seasonal_length, n_jobs=-1)
-                model.fit(self.y_train)
-
-        else:
-            model.fit(self.y_train)
-
-        # get the prediction
-        if self.holdout:
-            # fit the model
-            y_pred = model.update_predict(self.fc_df, self.cross_validator)
-            # Convert to the right format
-            if self.h > 1:
-                y_pred = (
-                    y_pred.unstack()
-                    .unstack(level=1)
-                    .reset_index()
-                    .rename(columns={"level_0": "cutoff", "Period": "date"})
-                )
-                # Collapse
-                y_pred = pd.melt(
-                    y_pred,
-                    id_vars=["date", "cutoff"],
-                    value_vars=y_pred.columns[2:],
-                    value_name="y",
-                    var_name="unique_id",
-                )
-        else:
-            # fit the model
-            y_pred = model.predict(fh=self.fh)
-            # Convert to the right format
-            y_pred = (
-                y_pred.unstack()
-                .reset_index()
-                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y"})
-            )
-            # Add the last day as cutoff
-            y_pred["cutoff"] = self.fc_df.index.max()
-
-        # add the model name
-        y_pred["Model"] = name
-
-        # add the model name
-        y_pred["Model"] = name
-
-        # return
-        return y_pred
 
     def add_fh_cv(self):
         """
@@ -364,6 +313,86 @@ class StatisticalForecaster(object):
             # also add the cv
             self.forecast_df["cv"] = None
 
+    def calculate_residuals(self):
+        """
+        Calculate residuals for all horizons.
+
+        Args:
+            None
+
+        Returns:
+            pandas.DataFrame : The residuals for all models and horizons.
+
+        """
+
+        # Define the end date for the fitting period
+        end_date = self.h + self.cv - 1
+
+        # Get the fitting period
+        fitting_periods = sorted(self.fc_df["ds"].unique())[:-end_date]
+        # I am adding a manual threshold to avoid an error when the number of fitting periods is too small
+        total_windows = (
+            40
+            if len(fitting_periods) - self.h + 1 > 40
+            else len(fitting_periods) - self.h + 1
+        )
+
+        # Remove Naive and Seasonal Naive from the models to avoid an error
+        temp_models = [
+            model
+            for model in self.fitted_models
+            if model.alias != "Naive" and model.alias != "SeasonalNaive"
+        ]
+
+        # define a new forecaster
+        forecaster_residuals = StatsForecast(
+            models=temp_models,
+            df=self.fc_df,
+            freq=self.freq,
+            n_jobs=self.n_jobs,
+            verbose=False,
+        )
+
+        # Fit
+        _ = forecaster_residuals.cross_validation(
+            h=self.h,
+            n_windows=total_windows,
+            input_size=self.seasonal_length,
+            refit=False,
+            fitted=True,
+        )
+
+        # Get the residuals
+        res = forecaster_residuals.cross_validation_fitted_values()
+
+        # Convert to the right format
+
+        # Reset index and rename
+        res = res.reset_index().rename(columns={"ds": "date", "y": "y_true"})
+
+        # Melt
+        res = pd.melt(
+            res,
+            id_vars=["unique_id", "date", "cutoff", "y_true"],
+            var_name="Model",
+            value_name="y_pred",
+        )
+
+        # add the number of cv and fh
+        cv_vals = sorted(res["cutoff"].unique())
+        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+        res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
+
+        # add the fh
+        fh_vals = np.tile(np.arange(1, self.h + 1), int(len(res) / self.h))
+        res["fh"] = fh_vals
+
+        # add the residuals
+        self.residuals = res
+
+        # return
+        return self.residuals
+
     def residual_diagnosis(self, model, type, agg_func=None, n=1, index_ids=None):
         """
         Plots the residuals for a given model together with the ACF plot and a histogram.
@@ -386,10 +415,16 @@ class StatisticalForecaster(object):
         """
 
         # Get residuals if we haven't already
-        self.calculate_residuals()
+        if hasattr(self, "residuals"):
+            res = self.residuals.copy()
+        else:
+            res = self.calculate_residuals()
 
+        # Add the residual
+        res["residual"] = res["y_true"] - res["y_pred"]
+        self.temp = res
         # filter residuals for the given model
-        f_res = self.residuals[self.residuals["Model"] == model]
+        f_res = res[res["Model"].str.contains(model)]
 
         # Convert the df to the right format
         # 1st: Keep only 1-step ahead residuals
@@ -496,124 +531,3 @@ class StatisticalForecaster(object):
             ax3.set_facecolor((gray_scale, gray_scale, gray_scale))
 
             plt.show()
-
-    def compute_full_insample_forecasts(self, model, cv, name):
-        """
-        For every model estimates the residuals for all horizons.
-
-        Args:
-            model : sktime.BaseForecaster
-                A sktime forecaster model to use for generating predictions.
-            cv : sktime.BaseCrossValidator
-                A sktime cross-validator to use for generating predictions.
-            name : str
-                The name of the model to use.
-
-        Returns:
-            pandas.DataFrame
-                The residuals for all models and horizons.
-
-        """
-
-        res = model.update_predict(self.y_train, cv, update_params=False)
-
-        if self.h > 1:
-            # Convert to the right format
-            res = (
-                res.unstack()
-                .unstack(level=1)
-                .reset_index()
-                .rename(columns={"level_0": "cutoff", "Period": "date"})
-            )
-            res = pd.melt(
-                res,
-                id_vars=["date", "cutoff"],
-                value_vars=res.columns[2:],
-                value_name="y_pred",
-                var_name="unique_id",
-            )
-
-            # Drop NaNs
-            res = res.dropna(axis=0, subset=["y_pred"])
-
-            # Add the cv and the fh
-            cv_vals = sorted(res["cutoff"].unique())
-            cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
-            res["cv"] = [cv_dict[date] for date in res["cutoff"].values]
-
-            # Add the forecast horizon.
-            fh_vals = np.tile(self.fh, int(len(res) / self.h))
-            res["fh"] = fh_vals
-
-        else:
-            res = (
-                res.unstack()
-                .reset_index()
-                .rename(columns={"level_0": "unique_id", "Period": "date", 0: "y_pred"})
-            )
-
-            # add fh and cv
-            res["fh"] = 1
-            res["cv"] = 1
-
-            # Add the cutoff
-            cutoff_period = pd.date_range(
-                end=res["date"].values[-2].to_timestamp(),
-                periods=len(res["date"].unique()),
-                freq=self.freq,
-            )
-            res["cutoff"] = np.tile(cutoff_period, len(res["unique_id"].unique()))
-
-        # Add the model name
-        res["Model"] = name
-
-        return res
-
-    def calculate_residuals(self):
-        """
-        Calculate residuals for all horizons.
-
-        Args:
-            None
-
-        Returns:
-            pandas.DataFrame : The residuals for all models and horizons.
-
-        """
-
-        # Get the true dataframe
-        true_df = self.y_train.copy().reset_index()
-
-        # melt
-        true_df = pd.melt(
-            true_df,
-            id_vars="Period",
-            value_vars=true_df.columns,
-            value_name="y_true",
-            var_name="unique_id",
-        ).rename(columns={"Period": "date"})
-
-        # Define the new cross-validator
-        cross_validator = SlidingWindowSplitter(
-            window_length=self.seasonal_length, fh=self.fh, step_length=1
-        )
-
-        # Estimate residuals for all models
-        res = pd.concat(
-            [
-                self.compute_full_insample_forecasts(model, cross_validator, name)
-                for model, name in zip(self.fitted_models, self.model_names)
-            ]
-        )
-
-        # Merge with the true values
-        res = pd.merge(res, true_df, on=["unique_id", "date"])
-
-        # Calculate the residual
-        res["residual"] = res["y_true"] - res["y_pred"]
-
-        # Add to the object
-        self.residuals = res
-
-        # Return
-        return res
