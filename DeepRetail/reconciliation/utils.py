@@ -207,7 +207,7 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
     ).sum()
 
     # change the frequency of the columns to the resampled_freq
-    resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
+    # resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
 
     return resample_df
 
