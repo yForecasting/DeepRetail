@@ -823,6 +823,9 @@ class THieF(object):
             .rename(columns={"level_0": "temporal_level"})
         )
 
+        # Calculate residuals
+        temp_residuals["residual"] = temp_residuals["y_pred"] - temp_residuals["y_true"]
+
         # keep only relevant columns
         to_keep = ["temporal_level", "unique_id", "cv", "fh", "Model", "residual"]
 
