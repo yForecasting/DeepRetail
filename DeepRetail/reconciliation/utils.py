@@ -139,9 +139,9 @@ def compute_resampled_frequencies(factors, bottom_freq):
     return resample_factors
 
 
-def compute_matrix_S(factors):
+def compute_matrix_S_temporal(factors):
     """
-    Computes the summation matrix s
+    Computes the summation matrix S for temporal levels
 
     Args:
         factors (list): a list of factors for the temporal levels
@@ -166,7 +166,9 @@ def compute_matrix_S(factors):
         # loop through the frequencies
         for i in range(max_freq // factors[k]):
             # populate the S_thief matrix
-            S_thief[k][i, factors[k] * i : factors[k] + factors[k] * i] = 1
+            S_thief[k][
+                i, factors[k] * i : factors[k] + factors[k] * i  # noqa: E203
+            ] = 1
 
     # reverse the order of the stacked levels
     S_thief = S_thief[::-1]
@@ -198,7 +200,7 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
     # check if the number of observations is divisible by the factor
     if total_obs % factor != 0:
         # if not, drop observations from the beginning
-        df = df.iloc[:, total_obs % factor :]
+        df = df.iloc[:, total_obs % factor :]  # noqa: E203
 
     resample_df = df.resample(
         str(factor) + bottom_freq, closed="left", label="left", axis=1
@@ -378,3 +380,43 @@ def get_w_matrix_mse(res_df):
             W_inv = np.concatenate((W_inv, temp_W[np.newaxis, :, :]), axis=0)
 
     return W_inv
+
+
+def compute_matrix_S_cross_sectional(df):
+    """
+    Estimates the S matrix for cross-sectional reconcliation.
+
+    Args:
+        df (pandas.DataFrame): a pandas DataFrame with the hierarchical structure.
+            Note: Generated using the extract_hierarchical_structure function.
+
+    Returns:
+        pandas.DataFrame: a pandas DataFrame representing the S matrix.
+
+    """
+
+    # Switch the index with the lowest level of the hierarchy
+    # Take the new index
+    new_index = df.columns[0]
+    df = df.reset_index(drop=True).set_index(df[new_index].copy())
+
+    # Get the total levels -> the column names
+    # But reversed -> start from the top to the bottom
+    total_levels = df.columns.values[::-1]
+
+    # Initialize a dataframe to concat the S matrix
+    S = pd.DataFrame()
+
+    # Itterate over column names and stack them to create the S matrix
+    for level in total_levels:
+        # Get dummies and transpose
+        temp_level = pd.get_dummies(df[level]).T
+
+        # Concat with the S mat
+        S = pd.concat([S, temp_level], axis=0)
+
+    # Sort columns on S
+    # This is the most time consuming step
+    S = S.sort_index(axis=1)
+
+    return S
