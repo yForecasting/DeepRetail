@@ -373,7 +373,10 @@ def get_w_matrix_mse(res_df):
         temp_weights = 1 / temp_mse
         # Convert to diagonal matrix
         temp_W = np.diag(temp_weights)
-
+        # Ensure no infs or nans.
+        # If exist convert to 0
+        temp_weights[np.isinf(temp_weights)] = 0
+        temp_weights[np.isnan(temp_weights)] = 0
         # Initialize matrix if it does not exist
         if i == 0:
             # add an extra dimension to the matrix
