@@ -11,6 +11,7 @@ import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from statsmodels.tsa.stattools import acf
+from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 
 class StatisticalForecaster(object):
@@ -325,58 +326,9 @@ class StatisticalForecaster(object):
 
         """
 
-        # Define the end date for the fitting period
-        end_date = self.h + self.cv - 1
-
-        # Get the fitting period
-        fitting_periods = sorted(self.fc_df["ds"].unique())[:-end_date]
-        # I am adding a manual threshold to avoid an error when the number of fitting periods is too small
-        total_windows = (
-            40
-            if len(fitting_periods) - self.h + 1 > 40
-            else len(fitting_periods) - self.h + 1
-        )
-
-        # Remove Naive and Seasonal Naive from the models to avoid an error
-        temp_models = [
-            model
-            for model in self.fitted_models
-            if model.alias != "Naive" and model.alias != "SeasonalNaive"
-        ]
-
-        # define a new forecaster
-        forecaster_residuals = StatsForecast(
-            models=temp_models,
-            df=self.fc_df,
-            freq=self.freq,
-            n_jobs=self.n_jobs,
-            verbose=False,
-        )
-
-        # Fit
-        _ = forecaster_residuals.cross_validation(
-            h=self.h,
-            n_windows=total_windows,
-            input_size=self.seasonal_length,
-            refit=False,
-            fitted=True,
-        )
-
-        # Get the residuals
-        res = forecaster_residuals.cross_validation_fitted_values()
-
-        # Convert to the right format
-
-        # Reset index and rename
-        res = res.reset_index().rename(columns={"ds": "date", "y": "y_true"})
-
-        # Melt
-        res = pd.melt(
-            res,
-            id_vars=["unique_id", "date", "cutoff", "y_true"],
-            var_name="Model",
-            value_name="y_pred",
-        )
+        # Uses statsmodels for getting the residuals
+        # statsforecast is buggy
+        res = self.calculate_residuals_statsmodels()
 
         # add the number of cv and fh
         cv_vals = sorted(res["cutoff"].unique())
@@ -392,6 +344,71 @@ class StatisticalForecaster(object):
 
         # return
         return self.residuals
+
+    def calculate_residuals_statsmodels(self):
+        """
+        Calculates residuals using the statsmodels ETS
+        It is used as a fallback when statsforecast fails
+        It fails when len(y) < nparams + 4 where nparams the number of ETS parameters
+
+        Args:
+            None
+
+        Returns:
+            pandas.DataFrame : The residuals for all models and horizons.
+
+        """
+
+        # Initialize simmulation parameters
+        end_date = self.h + self.cv - 1
+        fitting_periods = sorted(self.fc_df["ds"].unique())[:-end_date]
+        total_windows = len(fitting_periods) - self.h + 1
+
+        # Pivot the dataframe
+        temp_df = pd.pivot_table(
+            self.fc_df, index="unique_id", columns="ds", values="y", aggfunc="first"
+        )
+
+        # Initialize a df
+        temp_residuals = pd.DataFrame()
+
+        # Itterate over each time series
+        for i, row in temp_df.iterrows():
+            # Cut row at the end date
+            row = row[:-end_date]
+
+            model = ETSModel(row, seasonal_periods=self.seasonal_length)
+            fit = model.fit(disp=False)
+            # initialie a df
+            in_sample_df = pd.DataFrame()
+            for i in range(total_windows - 1):
+                # Run the simulation
+                in_sample_multistep = fit.simulate(
+                    nsimulations=self.h, anchor=i, repetitions=1, random_errors=None
+                ).to_frame()
+                # add the cutoff
+                in_sample_multistep["cutoff"] = fitting_periods[i]
+                # add to the df
+                in_sample_df = pd.concat([in_sample_df, in_sample_multistep], axis=0)
+
+            # Edit the format
+            # add the unique_id
+            in_sample_df["unique_id"] = row.name
+            # Add the true values
+            row = row.to_frame()
+            row.columns = ["y_true"]
+            in_sample_df = in_sample_df.merge(row, left_index=True, right_index=True)
+            # rename
+            in_sample_df = in_sample_df.rename(columns={"simulation": "y_pred"})
+            # reset index
+            in_sample_df = in_sample_df.reset_index(names="date")
+            # add to the df
+            temp_residuals = pd.concat([temp_residuals, in_sample_df], axis=0)
+
+        # add the Model
+        temp_residuals["Model"] = "AutoETS"
+
+        return temp_residuals
 
     def residual_diagnosis(self, model, type, agg_func=None, n=1, index_ids=None):
         """
