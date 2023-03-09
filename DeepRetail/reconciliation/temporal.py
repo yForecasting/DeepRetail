@@ -831,7 +831,7 @@ class THieF(object):
         )
 
         # Calculate residuals
-        temp_residuals["residual"] = temp_residuals["y_pred"] - temp_residuals["y_true"]
+        # temp_residuals["residual"] = temp_residuals["y_true"] - temp_residuals["y_pred"]
 
         # keep only relevant columns
         to_keep = ["temporal_level", "unique_id", "cv", "fh", "Model", "residual"]
