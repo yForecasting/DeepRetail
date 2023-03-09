@@ -448,3 +448,29 @@ def cross_product(x):
     """
 
     return x.T @ x
+
+
+def cov2corr(cov, return_std=None):
+    """
+    Function to convert a covariance matrix to a correlation matrix
+
+    Args:
+        cov (np.array): covariance matrix
+        return_std (bool): if True, return the standard deviation of the variables
+
+    Returns:
+        corr (np.array): correlation matrix
+
+    References:
+        https://www.statsmodels.org/dev/_modules/statsmodels/stats/moment_helpers.html#cov2corr
+    """
+    # Calculate the standard deviation for each variable
+    std = np.sqrt(np.diag(cov))
+    # Calculate the correlation matrix
+    corr = cov / np.outer(std, std)
+
+    # corr[cov == 0] = 0
+    if return_std:
+        return corr, std
+    else:
+        return corr
