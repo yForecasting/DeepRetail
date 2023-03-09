@@ -364,7 +364,7 @@ def get_w_matrix_mse(res_df):
         # Get them on the right order
         # sort temp_df descending based on temporal_level first and ascending based on fh
         temp_df = temp_df.sort_values(
-            by=["temporal_level", "fh"], ascending=[False, True]
+            by=["temporal_level", "cv"], ascending=[False, True]
         )
 
         # take the values of the mse
