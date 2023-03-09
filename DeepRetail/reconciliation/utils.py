@@ -433,3 +433,18 @@ def compute_matrix_S_cross_sectional(df):
     S = S.sort_index(axis=1)
 
     return S
+
+
+def cross_product(x):
+    """
+    Returns the cross product of a vector
+
+    Args:
+        x (np.array): vector
+            The vector to calculate the cross product of
+
+    Returns:
+        cross_product (np.array): cross product of the vector
+    """
+
+    return x.T @ x
