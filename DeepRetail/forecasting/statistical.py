@@ -431,6 +431,9 @@ class StatisticalForecaster(object):
         # add the Model
         temp_residuals["Model"] = "AutoETS"
 
+        # Calculate the residuals
+        temp_residuals["residual"] = temp_residuals["y_true"] - temp_residuals["y_pred"]
+
         return temp_residuals
 
     def residual_diagnosis(self, model, type, agg_func=None, n=1, index_ids=None):
