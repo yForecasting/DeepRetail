@@ -550,7 +550,7 @@ class THieF(object):
         self.holdout = holdout
         self.cv = cv
 
-    def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
+    def fit(self, original_df, format="pivoted"):
         """
         Fits the model on the given dataframe.
         The functions prepares the input dataframe to the right format.
@@ -585,7 +585,7 @@ class THieF(object):
                 # Manual cross-validation
                 # Define start and end points for each fold
                 temp_startpoint = end_point - z
-                temp_endpoint = cv - z - 1
+                temp_endpoint = self.cv - z - 1
 
                 # Split
                 temp_test_df = (
