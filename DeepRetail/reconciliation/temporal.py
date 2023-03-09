@@ -82,7 +82,9 @@ class TemporalReconciler(object):
         >>> reconciled = temporal_reconciler.reconcile('struc')
     """
 
-    def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+    def __init__(
+        self, bottom_level_freq, factors=None, top_fh=1, holdout=False, cv=None
+    ):
         """
         Initializes the TemporalReconciler class.
 
@@ -93,6 +95,8 @@ class TemporalReconciler(object):
                 Should be given if bottom_freq is not given.
             top_fh (int, optional): The forecast horizon of the top level forecasts.
                 The default is 1.
+            holdout (bool, optional): Whether to use holdout or not.
+            cv (int, optional): The number of folds to use for holdout.
 
         Raises:
             TypeError: If neither factors nor bottom_freq is given.
@@ -126,6 +130,9 @@ class TemporalReconciler(object):
 
         # Construct the Smat
         self.Smat = compute_matrix_S_temporal(self.factors)
+
+        self.holdout = holdout
+        self.cv = cv
 
     def get_reconciliation_format(self):
         """
@@ -209,7 +216,7 @@ class TemporalReconciler(object):
                 residual_df.groupby(["unique_id", "temporal_level"])
                 .agg({"residual_squarred": "mean"})
                 .reset_index()
-             )
+            )
 
             # Get the matrix W
             Wmat = get_w_matrix_mse(residual_df, self.factors)
@@ -306,20 +313,17 @@ class TemporalReconciler(object):
 
         return reco_df
 
-    def fit(self, base_fc_df, holdout=False, cv=None):
+    def fit(self, base_fc_df):
         """
         Fits the reconciler on the given dataframe of base forecasts
 
         Args:
             base_fc_df (pandas.DataFrame): The dataframe of base forecasts.
-            holdout (bool, optional): Whether to use holdout or not.
-            cv (int, optional): The number of folds to use for holdout.
+
 
         Returns:
             None
         """
-        self.holdout = holdout
-        self.cv = cv
 
         # if we have holdout:
         if self.holdout:
@@ -489,7 +493,9 @@ class THieF(object):
 
     """
 
-    def __init__(self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None):
+    def __init__(
+        self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None
+    ):
         """
         Initializes the THieF class.
         It constructs the temporal levels and assigns fundamental parameters.
@@ -855,13 +861,14 @@ class THieF(object):
 
         # Define the TemporalReconciler
         self.temporal_reconciler = TemporalReconciler(
-            bottom_level_freq=self.bottom_level_freq, factors=self.factors
+            bottom_level_freq=self.bottom_level_freq,
+            factors=self.factors,
+            holdout=self.holdout,
+            cv=self.cv,
         )
 
         # Fit the reconciler
-        self.temporal_reconciler.fit(
-            self.base_forecasts, holdout=self.holdout, cv=self.cv
-        )
+        self.temporal_reconciler.fit(self.base_forecasts)
 
         # Reconcile
         self.reconciled_df = self.temporal_reconciler.reconcile(
