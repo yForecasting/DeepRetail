@@ -364,9 +364,7 @@ def get_w_matrix_mse(res_df, factors):
 
         # Get them on the right order
         # sort temp_df descending based on temporal_level first and ascending based on fh
-        temp_df = temp_df.sort_values(
-            by=["temporal_level"], ascending=[False]
-        )
+        temp_df = temp_df.sort_values(by=["temporal_level"], ascending=[False])
 
         # repeat rows based  on the number of factors column
         temp_df = temp_df.loc[np.repeat(temp_df.index.values, factors)]
@@ -474,3 +472,64 @@ def cov2corr(cov, return_std=None):
         return corr, std
     else:
         return corr
+
+
+def shrink_estim(res, cov_mat):
+    """
+    Shrinkage of the covariance matrix according to Schäfer and Strimmer 2005
+
+    Args:
+        res (np.array): the matrix with the residuals
+        cov_mat (np.array): the covariance matrix of the residuals
+
+    Returns:
+        w_shr (np.array): the shrinked covariance matrix
+        lambda_ (float): the shrinkage parameter
+
+    References:
+        https://www.cs.princeton.edu/~bee/courses/read/schafer-SAGMB-2005.pdf
+        https://github.com/daniGiro/FoReco/blob/9ace22dd39e20a736600dfafcf29a89f89f90aca/R/shrink_estim.R
+        https://github.com/earowang/hts/blob/master/R/MinT.R
+
+    """
+
+    # Get the total number of time series
+    n = res.shape[0]
+
+    # Discard the off-diagonal elements
+    # result is a square matrix
+    tar = np.diag(np.diag(cov_mat))
+
+    # Get the correlation matrix
+    corm, res_std = cov2corr(cov_mat, return_std=True)
+    corm = np.nan_to_num(corm, nan=0.0)  # remove nans
+
+    # Standardize the data by dividing each column by the square root of its corresponding diagonal element
+    # in the covariance matrix
+    xs = np.divide(res, res_std, out=np.zeros_like(res), where=res_std != 0)
+    # nice trick to avoid division by zero
+    # reference: https://github.com/Nixtla/hierarchicalforecast/blob/main/hierarchicalforecast/methods.py
+
+    # remove rows with missing vals
+    xs = xs[~np.isnan(xs).any(axis=1), :]
+
+    # calculate v
+    v = (1 / (n * (n - 1))) * (
+        cross_product(xs**2) - (1 / n) * (cross_product(xs) ** 2)
+    )
+    # Set the diagonal elements to zero
+    np.fill_diagonal(v, 0)
+
+    # Get the correlation matrix on the off-diagonal elements
+    corapn = cov2corr(tar)
+    # Again deal with nans
+    corapn = np.nan_to_num(corapn, nan=0.0)
+    # Squared differences between the correlation matrices
+    d = (corm - corapn) ** 2
+
+    lambda_ = np.sum(v) / np.sum(d)
+    lambda_ = max(min(lambda_, 1), 0)
+
+    shrinked_cov = lambda_ * tar + (1 - lambda_) * cov_mat
+
+    return shrinked_cov, lambda_
