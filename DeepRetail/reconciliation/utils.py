@@ -314,7 +314,7 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     # S * (S_T * W_inv * S)^-1 S_T * W_inv * pred
 
     # First we inverse W
-    W_inv = np.linalg.pinv(Wmat)
+    W_inv = np.linalg.inv(Wmat)
 
     # Then get the A = S_T * W_inv * S
     A = Smat.T @ W_inv @ Smat
