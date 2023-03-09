@@ -314,21 +314,26 @@ class StatisticalForecaster(object):
             # also add the cv
             self.forecast_df["cv"] = None
 
-    def calculate_residuals(self):
+    def calculate_residuals(self, type="default"):
         """
         Calculate residuals for all horizons.
 
         Args:
-            None
+            type: str, optional (default='default')
+                The type of residuals to calculate. Options are 'default' and 'multistep'.
 
         Returns:
             pandas.DataFrame : The residuals for all models and horizons.
 
         """
 
+        # Ensure type is either default or multistep
+        if type not in ["default", "multistep"]:
+            raise ValueError("Type must be either 'default' or 'multistep'.")
+
         # Uses statsmodels for getting the residuals
         # statsforecast is buggy
-        res = self.calculate_residuals_statsmodels()
+        res = self.calculate_residuals_statsmodels(type="default")
 
         # add the number of cv and fh
         cv_vals = sorted(res["cutoff"].unique())
@@ -337,7 +342,7 @@ class StatisticalForecaster(object):
 
         # add the fh
         fh_vals = np.tile(np.arange(1, self.h + 1), int(len(res) / self.h))
-        res["fh"] = fh_vals
+        res["fh"] = 1 if type == "default" else fh_vals
 
         # add the residuals
         self.residuals = res
@@ -345,14 +350,16 @@ class StatisticalForecaster(object):
         # return
         return self.residuals
 
-    def calculate_residuals_statsmodels(self):
+    def calculate_residuals_statsmodels(self, type):
         """
         Calculates residuals using the statsmodels ETS
         It is used as a fallback when statsforecast fails
         It fails when len(y) < nparams + 4 where nparams the number of ETS parameters
 
         Args:
-            None
+            type: str, optional (default='default')
+                The type of residuals to calculate.
+                Options are 'default' and 'multistep'.
 
         Returns:
             pandas.DataFrame : The residuals for all models and horizons.
@@ -381,15 +388,23 @@ class StatisticalForecaster(object):
             fit = model.fit(disp=False)
             # initialie a df
             in_sample_df = pd.DataFrame()
-            for i in range(total_windows - 1):
-                # Run the simulation
-                in_sample_multistep = fit.simulate(
-                    nsimulations=self.h, anchor=i, repetitions=1, random_errors=None
-                ).to_frame()
-                # add the cutoff
-                in_sample_multistep["cutoff"] = fitting_periods[i]
-                # add to the df
-                in_sample_df = pd.concat([in_sample_df, in_sample_multistep], axis=0)
+
+            if type == "multistep":
+                # Get multi-step in-sample predictions
+                for i in range(total_windows - 1):
+                    # Run the simulation
+                    in_sample_multistep = fit.simulate(
+                        nsimulations=self.h, anchor=i, repetitions=1, random_errors=None
+                    ).to_frame()
+                    # add the cutoff
+                    in_sample_multistep["cutoff"] = fitting_periods[i]
+                    # add to the df
+                    in_sample_df = pd.concat(
+                        [in_sample_df, in_sample_multistep], axis=0
+                    )
+            else:
+                # get the fitted values
+                in_sample_df = fit.fittedvalues.to_frame()
 
             # Edit the format
             # add the unique_id
@@ -399,9 +414,17 @@ class StatisticalForecaster(object):
             row.columns = ["y_true"]
             in_sample_df = in_sample_df.merge(row, left_index=True, right_index=True)
             # rename
-            in_sample_df = in_sample_df.rename(columns={"simulation": "y_pred"})
+            in_sample_df = in_sample_df.rename(
+                columns={"simulation": "y_pred", 0: "y_pred"}
+            )
             # reset index
             in_sample_df = in_sample_df.reset_index(names="date")
+            # add the cutoff for default tyoe
+            if type == "default":
+                in_sample_df["cutoff"] = in_sample_df["date"].shift(1)
+                # drop the first row
+                in_sample_df = in_sample_df.dropna()
+
             # add to the df
             temp_residuals = pd.concat([temp_residuals, in_sample_df], axis=0)
 
