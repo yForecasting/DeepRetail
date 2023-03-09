@@ -342,12 +342,13 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     return y_tilde
 
 
-def get_w_matrix_mse(res_df):
+def get_w_matrix_mse(res_df, factors):
     """
     Get the W matrix for MSE scaling
 
     Args:
         res_df (pandas.DataFrame): a pandas DataFrame containing the residuals
+        factors (list): a list of factors for the temporal levels
 
     Returns:
         numpy.ndarray: a numpy array representing the W matrix
@@ -364,8 +365,11 @@ def get_w_matrix_mse(res_df):
         # Get them on the right order
         # sort temp_df descending based on temporal_level first and ascending based on fh
         temp_df = temp_df.sort_values(
-            by=["temporal_level", "cv"], ascending=[False, True]
+            by=["temporal_level"], ascending=[False]
         )
+
+        # repeat rows based  on the number of factors column
+        temp_df = temp_df.loc[np.repeat(temp_df.index.values, factors)]
 
         # take the values of the mse
         temp_mse = temp_df["residual_squarred"].values
@@ -375,8 +379,11 @@ def get_w_matrix_mse(res_df):
         temp_W = np.diag(temp_weights)
         # Ensure no infs or nans.
         # If exist convert to 0
-        temp_weights[np.isinf(temp_weights)] = 0
-        temp_weights[np.isnan(temp_weights)] = 0
+        # temp_weights[np.isinf(temp_weights)] = 0
+        # temp_weights[np.isnan(temp_weights)] = 0
+        # Replace inf with zeros
+        temp_W = np.nan_to_num(temp_W)
+
         # Initialize matrix if it does not exist
         if i == 0:
             # add an extra dimension to the matrix
