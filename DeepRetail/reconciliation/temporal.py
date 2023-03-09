@@ -489,7 +489,7 @@ class THieF(object):
 
     """
 
-    def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+    def __init__(self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None):
         """
         Initializes the THieF class.
         It constructs the temporal levels and assigns fundamental parameters.
@@ -502,6 +502,10 @@ class THieF(object):
                 The factors to use for the temporal levels.
             top_fh (int, optional):
                 The top forecast horizon.
+            holdout (bool, optional):
+                Whether to use holdout or not.
+            cv (int, optional):
+                The number of folds to use for holdout.
 
         Returns:
             None
@@ -542,6 +546,10 @@ class THieF(object):
         # Construct the Smat
         self.Smat = compute_matrix_S_temporal(self.factors)
 
+        # add the holdout and the cv
+        self.holdout = holdout
+        self.cv = cv
+
     def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
         """
         Fits the model on the given dataframe.
@@ -550,10 +558,6 @@ class THieF(object):
         Args:
             original_df (pd.DataFrame):
                 The original dataframe.
-            holdout (bool, optional):
-                Whether to use holdout or not.
-            cv (int, optional):
-                The number of folds to use for holdout.
             format (str, optional):
                 The format of the input dataframe.
                 It can be either 'pivoted' or 'transaction'.
@@ -565,10 +569,7 @@ class THieF(object):
 
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
-
         self.original_df = original_df
-        self.holdout = holdout
-        self.cv = cv
 
         # If we have holdout:
         if self.holdout:
