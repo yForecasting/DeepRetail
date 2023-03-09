@@ -205,14 +205,14 @@ class TemporalReconciler(object):
             residual_df["residual_squarred"] = residual_df["residual"] ** 2
 
             # Groupby unique_id, temporal_level and fh and get the Mean Squared Error
-            # residual_df = (
-            #    residual_df.groupby(["unique_id", "temporal_level", "fh"])
-            #    .agg({"residual_squarred": "mean"})
-            #    .reset_index()
-            # )
+            residual_df = (
+                residual_df.groupby(["unique_id", "temporal_level"])
+                .agg({"residual_squarred": "mean"})
+                .reset_index()
+             )
 
             # Get the matrix W
-            Wmat = get_w_matrix_mse(residual_df)
+            Wmat = get_w_matrix_mse(residual_df, self.factors)
 
         elif reconciliation_method == "variance":
             ...
