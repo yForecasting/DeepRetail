@@ -132,6 +132,8 @@ class TemporalReconciler(object):
         self.Smat = compute_matrix_S_temporal(self.factors)
 
         self.holdout = holdout
+        if cv is None:
+            cv = 1
         self.cv = cv
 
     def get_reconciliation_format(self):
@@ -554,6 +556,8 @@ class THieF(object):
 
         # add the holdout and the cv
         self.holdout = holdout
+        if cv is None:
+            self.cv = 1
         self.cv = cv
 
     def fit(self, original_df, format="pivoted"):
@@ -781,7 +785,7 @@ class THieF(object):
             # Generate base forecasts
             temp_base_forecasts = {
                 factor: self.base_forecasters[factor].predict(
-                    h=self.frequencies[i], holdout=False, cv=None
+                    h=self.frequencies[i], holdout=False,
                 )
                 for i, factor in enumerate(self.factors)
             }
