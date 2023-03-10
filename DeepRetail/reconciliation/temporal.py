@@ -781,7 +781,7 @@ class THieF(object):
             # Generate base forecasts
             temp_base_forecasts = {
                 factor: self.base_forecasters[factor].predict(
-                    h=self.frequencies[i], holdout=False
+                    h=self.frequencies[i], holdout=False, cv=None
                 )
                 for i, factor in enumerate(self.factors)
             }
