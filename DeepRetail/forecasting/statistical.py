@@ -224,7 +224,7 @@ class StatisticalForecaster(object):
             The forecasted values, along with the true values (if holdout=True).
 
         """
-        if not holdout and cv > 1:
+        if not holdout and cv is not None:
             raise ValueError("Cannot do cross validation without holdout.")
 
         if holdout and cv is None:
