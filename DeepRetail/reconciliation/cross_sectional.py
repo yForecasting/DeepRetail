@@ -14,6 +14,262 @@ import pandas as pd
 import numpy as np
 
 
+class CHieF(object):
+    """
+    A class for Cross-sectional Hierarchical Forecasting (CHieF) algorithm
+
+    The flow of the class is the following:
+    (1) Extract hierarchical infromation from a dataframe given the schema
+    (2) Compute the summation matrix S
+    (3) Extemd the dataframe to include all hierarchical levels.
+        It also renames the names of the time series accordingly.
+    (4) Fits a forecaster on the extended dataframe
+    (5) Generates base forecasts for all levels
+    (6) Reconciles the base forecasts to get coherent predictions
+
+    Args:
+        bottom_level_freq (str):
+            The frequency of the time series
+        h (int):
+            The number of periods to forecast
+        cv (int, optional):
+            The number of folds for cross-validation.
+            Defaults to None.
+        holdout (bool, optional):
+            Whether to use a holdout set.
+            Defaults to False.
+        df (pd.DataFrame):
+            Dataframe with the original time series
+        current_format (list):
+            The current format of the schema on the unique_id
+            For example ['top_level', 'middle_level', 'bottom_level']
+        corrected_format (list):
+            A list with the levels orders in the right order
+            Lower levels are first.
+            For example ['bottom_level', 'middle_level', 'top_level']
+        splitter (str):
+            The splitter used to separate the levels on the unique_id
+            For example '_'
+        add_total (bool, optional):
+            Whether to add a total column to the dataframe.
+            The higher level that aggregates everything.
+            Defaults to True.
+        format (str, optional):
+            The format of the dataframe.
+            Options are "pivoted" or "transaction".
+            Defaults to "pivoted".
+        models (list):
+            A list with the models to use for producing base forecasts
+        method (str):
+            The method to use for reconciliation
+
+        Methods:
+            fit:
+                Extracts the hierarchical structure and computes the S matrix.
+                It also extends the dataframe to incldue all levels.
+            predict:
+                Generates base forecasts
+            reconcile:
+                Reconciles the generated base forecasts
+
+
+
+        Examples:
+            >>> from DeepRetail.reconciliation.cross_sectional import CHieF
+
+            >>> # Initialize parameters
+            >>> freq = 'M'
+            >>> h = 12
+            >>> models = ['ETS']
+
+            >>> # Current format of the unique_id:
+            >>> # cat_catnum_itemnum_state_storenum
+            >>> # Example: Hobbies_1_1001_CA_1
+            >>> # Define the parameters
+            >>> current = ['cat', 'catnum', 'itemnum', 'state', 'storenum']
+            >>> correct = ['itemnum', 'catnum', 'cat', 'storenum', 'state']
+            >>> splitter = "_"
+            >>> total = False
+
+            >>> # Parameters for forecasting
+            >>> holdout = True
+            >>> cv = 1
+
+            >>> # Define CHieF
+            >>> chief = CHieF(bottom_level_freq = freq, h=h, holdout = holdout)
+
+            >>> # Fit CHieF
+            >>> chief.fit(
+            >>>        df = sample_df, current_format=current,
+            >>>        corrected_format=correct, splitter=splitter,
+            >>>        add_total = total, format = 'pivoted'
+            >>>        )
+
+            >>> # Get base forecasts
+            >>> base_forecasts = chief.predict(models = models)
+
+            >>> # Define reconciliation method
+            >>> method = 'var'
+
+            >>> # reconcile
+            >>> chief.reconcile(method = method)
+
+    """
+
+    def __init__(self, bottom_level_freq, h, cv=None, holdout=None):
+        """
+        Initializes the CHieF class
+        Assigns some attributes to the object
+
+        Args:
+            bottom_level_freq (str):
+                The frequency of the time series
+            h (int):
+                The number of periods to forecast
+            cv (int, optional):
+                The number of folds for cross-validation.
+                Defaults to None.
+            holdout (bool, optional):
+                Whether to use a holdout set.
+
+        Returns:
+            None
+        """
+        self.bottom_level_freq = bottom_level_freq
+        self.h = h
+        self.cv = cv
+        self.holdout = holdout
+        # Repeat for temporal too -> move the holdout and the cv to the init.
+
+    def fit(
+        self,
+        df,
+        current_format,
+        corrected_format,
+        splitter,
+        add_total=True,
+        format="pivoted",
+    ):
+        """
+        Fits the CHieF algorithm on the given dataframe.
+        In particular the method: Extracts the hierarchical structure and computes the S matrix.
+        It also extends the dataframe to incldue all levels
+
+        Args:
+            df (pd.DataFrame):
+                Dataframe with the original time series
+            current_format (list):
+                The current format of the schema on the unique_id
+                For example ['top_level', 'middle_level', 'bottom_level']
+            corrected_format (list):
+                A list with the levels orders in the right order
+                Lower levels are first.
+                For example ['bottom_level', 'middle_level', 'top_level']
+            splitter (str):
+                The splitter used to separate the levels on the unique_id
+                For example '_'
+            add_total (bool, optional):
+                Whether to add a total column to the dataframe.
+                The higher level that aggregates everything.
+                Defaults to True.
+            format (str, optional):
+                The format of the dataframe.
+                Options are "pivoted" or "transaction".
+                Defaults to "pivoted".
+
+        Returns:
+            None
+        """
+        # add to the object
+        self.original_df = df
+        self.format = format
+
+        # Extract the hierarchical structure
+        self.hierarchical_format = extract_hierarchical_structure(
+            self.original_df,
+            current_format,
+            corrected_format,
+            splitter,
+            add_total,
+            self.format,
+        )
+
+        # Compute the S matrix
+        self.S_mat = compute_matrix_S_cross_sectional(self.hierarchical_format)
+
+        # Build the new dataframe with the cross-sectional format
+        self.cross_sectional_df = build_cross_sectional_df(
+            self.original_df, self.hierarchical_format, format=self.format
+        )
+
+    def predict(self, models):
+        """
+        Computes base forecasts for all hierarchical levels given the selected model
+        In newer versions, user will select which model they want for every level
+
+        Args:
+            models (list):
+                A list with the models to use for producing base forecasts
+
+        Returns:
+            base_forecasts (pd.DataFrame):
+                A dataframe with the base forecasts
+
+        """
+        self.base_models = models
+
+        # Define the forecaster
+        self.base_forecaster = StatisticalForecaster(
+            models=models, freq=self.bottom_level_freq
+        )
+
+        # Fit the forecaster
+        self.base_forecaster.fit(self.cross_sectional_df, format="pivoted")
+
+        # Make base predictions
+        self.base_forecasts = self.base_forecaster.predict(
+            h=self.h, cv=self.cv, holdout=self.holdout
+        )
+
+        return self.base_forecasts
+
+    def reconcile(self, method):
+        """
+        Reconciles the generated base forecasts using the CrossSectionalReconciler
+
+        Args:
+            method (str):
+                The method to use for reconciliation
+
+        Returns:
+            reconciled_forecasts (pd.DataFrame):
+                The reconciled forecasts
+
+        """
+
+        # Define the reconciler
+        self.reconciler = CrossSectionalReconciler(
+            self.bottom_level_freq, self.h, cv=self.cv, holdout=self.holdout
+        )
+
+        # Fit the reconciler
+        self.reconciler.fit(self.base_forecasts, self.S_mat)
+
+        # If we have method that needs residuals
+        if method in ["var", "sam", "shrink", "mse"]:
+            # estimate the residuals
+            self.residuals = self.base_forecaster.calculate_residuals()
+        else:
+            self.residuals = None
+
+        # Reconcile
+        self.reconciled_forecasts = self.reconciler.reconcile(
+            method, residual_df=self.residuals
+        )
+
+        return self.reconciled_forecasts
+
+
 class CrossSectionalReconciler(object):
     """
     A class for Cross-sectional reconciliation
