@@ -351,12 +351,12 @@ class TemporalReconciler(object):
             # Converts to the right forecast format
             self.reconciliation_ready_df = self.get_reconciliation_format()
 
-    def reconcile(self, reconciliation_method, residual_df=None):
+    def reconcile(self, method, residual_df=None):
         """
         Reconciles the base forecasts.
 
         Args:
-            reconciliation_method (str): The reconciliation method to use.
+            method (str): The reconciliation method to use.
             residual_df (pandas.DataFrame, optional): The dataframe of residuals.
 
         Returns:
@@ -379,7 +379,7 @@ class TemporalReconciler(object):
 
                 # Get the Weight matrix
                 self.Wmat = self.compute_matrix_W(
-                    reconciliation_method, residual_df=temp_residual_df
+                    method, residual_df=temp_residual_df
                 )
 
                 # Reconciles
@@ -387,7 +387,7 @@ class TemporalReconciler(object):
 
                 # reverses the format
                 self.reconciled_df = self.reverse_reconciliation_format(
-                    reconciliation_method
+                    method
                 )
 
                 # Add the cv
@@ -412,7 +412,7 @@ class TemporalReconciler(object):
         else:
             # Get the Weight matrix
             self.Wmat = self.compute_matrix_W(
-                reconciliation_method, residual_df=residual_df
+                method, residual_df=residual_df
             )
 
             # Reconciles
@@ -420,7 +420,7 @@ class TemporalReconciler(object):
 
             # reverses the format
             self.reconciled_df = self.reverse_reconciliation_format(
-                reconciliation_method
+                method
             )
 
         return self.reconciled_df
@@ -845,12 +845,12 @@ class THieF(object):
 
         return temp_residuals[to_keep]
 
-    def reconcile(self, reconciliation_method):
+    def reconcile(self, method):
         """
         Reconciles base forecasts using the TemporalReconciler.
 
         Args:
-            reconciliation_method (str):
+            method (str):
                 The method to use for reconciliation.
                 Currently only supporting "struc".
 
@@ -876,7 +876,7 @@ class THieF(object):
 
         # Reconcile
         self.reconciled_df = self.temporal_reconciler.reconcile(
-            reconciliation_method, residual_df=self.base_forecast_residuals
+            method, residual_df=self.base_forecast_residuals
         )
 
         # Merge with the base forecasts
