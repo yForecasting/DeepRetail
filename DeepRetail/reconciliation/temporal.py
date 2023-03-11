@@ -10,6 +10,7 @@ from DeepRetail.reconciliation.utils import (
     compute_y_tilde,
     get_w_matrix_mse,
 )
+from DeepRetail.transformations.formats import pivoted_df
 import numpy as np
 import pandas as pd
 
@@ -576,6 +577,9 @@ class THieF(object):
             None
 
         """
+
+        # Ensure we have the right format
+        original_df = pivoted_df(original_df) if format == 'transaction' else original_df
 
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
