@@ -251,7 +251,8 @@ class TemporalReconciler(object):
 
         # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
         reconciled_values = [
-            compute_y_tilde(y, self.Smat, mat) for y, mat in zip(values, self.Wmat)
+            compute_y_tilde(y, self.Smat, mat, return_G=False)
+            for y, mat in zip(values, self.Wmat)
         ]
 
         # Convert to dataframe
@@ -379,17 +380,13 @@ class TemporalReconciler(object):
                 temp_residual_df = residual_df[residual_df["cv"] == k + 1]
 
                 # Get the Weight matrix
-                self.Wmat = self.compute_matrix_W(
-                    method, residual_df=temp_residual_df
-                )
+                self.Wmat = self.compute_matrix_W(method, residual_df=temp_residual_df)
 
                 # Reconciles
                 self.reconciled_df = self.get_reconciled_predictions()
 
                 # reverses the format
-                self.reconciled_df = self.reverse_reconciliation_format(
-                    method
-                )
+                self.reconciled_df = self.reverse_reconciliation_format(method)
 
                 # Add the cv
                 self.reconciled_df["cv"] = k + 1
@@ -412,17 +409,13 @@ class TemporalReconciler(object):
 
         else:
             # Get the Weight matrix
-            self.Wmat = self.compute_matrix_W(
-                method, residual_df=residual_df
-            )
+            self.Wmat = self.compute_matrix_W(method, residual_df=residual_df)
 
             # Reconciles
             self.reconciled_df = self.get_reconciled_predictions()
 
             # reverses the format
-            self.reconciled_df = self.reverse_reconciliation_format(
-                method
-            )
+            self.reconciled_df = self.reverse_reconciliation_format(method)
 
         return self.reconciled_df
 
@@ -579,7 +572,9 @@ class THieF(object):
         """
 
         # Ensure we have the right format
-        original_df = pivoted_df(original_df) if format == 'transaction' else original_df
+        original_df = (
+            pivoted_df(original_df) if format == "transaction" else original_df
+        )
 
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
@@ -789,7 +784,8 @@ class THieF(object):
             # Generate base forecasts
             temp_base_forecasts = {
                 factor: self.base_forecasters[factor].predict(
-                    h=self.frequencies[i], holdout=False,
+                    h=self.frequencies[i],
+                    holdout=False,
                 )
                 for i, factor in enumerate(self.factors)
             }
