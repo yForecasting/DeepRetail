@@ -287,6 +287,9 @@ class CrossSectionalReconciler(object):
     - sam: Sample Covariance matrix (Wickramasuriya et al, 2019)
     - shrink: Shurnk Covariance matrix (Wickramasuriya et al, 2019)
 
+    Others:
+    custom: Uses a user-given reconciliation matrix G.
+
     Note: Full covariance methods are unstable. Prefer the others
 
     Args:
@@ -429,7 +432,7 @@ class CrossSectionalReconciler(object):
                 self.original_df
             )
 
-    def reconcile(self, method, residual_df=None):
+    def reconcile(self, method, residual_df=None, Gmat=None):
         """
         Reconciles base forecasts using the given method
 
@@ -441,6 +444,9 @@ class CrossSectionalReconciler(object):
                 The dataframe with the residuals of the base forecasts.
                 Used for methods using the residuals.
                 Defaults to None.
+            Gmat (np.array, optional):
+                A custom G matrix for reconciliation.
+                Used when method = 'custom'.
 
         Returns:
             pd.DataFrame: The reconciled forecasts
@@ -451,7 +457,14 @@ class CrossSectionalReconciler(object):
         self.residual_df = residual_df
 
         # get the w matrix
-        self.W_mat = self.compute_w_matrix()
+        if self.reconciliation_method != "custom":
+            self.W_mat = self.compute_w_matrix()
+        elif self.reconciliation_method == "custom":
+            # ensure Gmat is given
+            if Gmat is None:
+                raise ValueError(
+                    "When using the custom method, you need to provide a custom G matrix"
+                )
 
         # Extract the values from the smat
         S_mat_vals = self.S_mat.values
@@ -469,7 +482,7 @@ class CrossSectionalReconciler(object):
 
                 # Compute the reconciled forecasts
                 self.y_tild_vals, G_mat = compute_y_tilde(
-                    y_hat_vals, S_mat_vals, self.W_mat, return_G=True
+                    y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True
                 )
 
                 # take the fold on the original df
@@ -498,7 +511,7 @@ class CrossSectionalReconciler(object):
 
             # Compute the reconciled forecasts
             self.y_tild_vals, self.G_mats = compute_y_tilde(
-                y_hat_vals, S_mat_vals, self.W_mat, return_G=True
+                y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True
             )
 
             # Give the right format
