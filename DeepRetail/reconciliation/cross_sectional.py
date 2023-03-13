@@ -460,6 +460,7 @@ class CrossSectionalReconciler(object):
         if self.holdout:
             # Initialize a list to include the reconciled dataframes for every fold
             self.reconciled_cv_dfs = []
+            self.G_mats = []
 
             # Itterate over the folds
             for fold in range(self.cv):
@@ -467,7 +468,9 @@ class CrossSectionalReconciler(object):
                 y_hat_vals = self.reconciliation_ready_cv_dfs[fold].values
 
                 # Compute the reconciled forecasts
-                self.y_tild_vals = compute_y_tilde(y_hat_vals, S_mat_vals, self.W_mat)
+                self.y_tild_vals, G_mat = compute_y_tilde(
+                    y_hat_vals, S_mat_vals, self.W_mat, return_G=True
+                )
 
                 # take the fold on the original df
                 temp_original_df = self.original_df[self.original_df["cv"] == fold + 1]
@@ -484,6 +487,7 @@ class CrossSectionalReconciler(object):
 
                 # Append
                 self.reconciled_cv_dfs.append(self.reconciled_df)
+                self.G_mats.append(G_mat)
 
             # Concatenate
             self.reconciled_df = pd.concat(self.reconciled_cv_dfs, axis=0)
@@ -493,7 +497,9 @@ class CrossSectionalReconciler(object):
             y_hat_vals = self.reconciliation_ready_df.values
 
             # Compute the reconciled forecasts
-            self.y_tild_vals = compute_y_tilde(y_hat_vals, S_mat_vals, self.W_mat)
+            self.y_tild_vals, self.G_mats = compute_y_tilde(
+                y_hat_vals, S_mat_vals, self.W_mat, return_G=True
+            )
 
             # Give the right format
             self.reconciled_df = self.reverse_reconciliation_format(
