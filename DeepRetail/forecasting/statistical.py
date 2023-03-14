@@ -92,7 +92,7 @@ class StatisticalForecaster(object):
 
     """
 
-    def __init__(self, models, freq, n_jobs=-1, warning=False, seasonal_length=None):
+    def __init__(self, models, freq, n_jobs=1, warning=False, seasonal_length=None):
         """
         Initialize the StatisticalForecaster object.
 
@@ -101,7 +101,7 @@ class StatisticalForecaster(object):
                 A list of models to fit. Currently only ETS is implemented.
             freq: str
                 The frequency of the data, e.g. 'D' for daily or 'M' for monthly.
-            n_jobs: int, default=-1
+            n_jobs: int, default=1
                 The number of jobs to run in parallel for the fitting process.
             warning: bool, default=False
                 Whether to show warnings or not.
