@@ -343,10 +343,7 @@ def compute_y_tilde(y_hat, Smat, Wmat, Gmat=None, return_G=False):
             A_inv = np.linalg.pinv(A)
 
         # Next, estimating G:
-        G = A_inv @ Smat.T @ W_inv
-
-        # Getting the y_tild
-        y_tild = Smat @ G @ y_hat
+        Gmat = A_inv @ Smat.T @ W_inv
 
         # Now we have y_tild = SGy_hat
 
@@ -364,13 +361,12 @@ def compute_y_tilde(y_hat, Smat, Wmat, Gmat=None, return_G=False):
         # y_tilde = C @ y_hat
         ###############################################
 
-    # If Gmat is provided, we use it
-    else:
-        # Getting the y_tild
-        y_tild = Smat @ Gmat @ y_hat
+    # Now we have y_tild = SGy_hat
+    # Getting the y_tild
+    y_tild = Smat @ Gmat @ y_hat
 
     if return_G:
-        return y_tild, G
+        return y_tild, Gmat
     else:
         return y_tild
 
