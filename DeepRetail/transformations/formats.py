@@ -315,3 +315,67 @@ def build_cross_sectional_df(df, hierarchical_df, format="pivoted"):
         new_pivoted_df = pd.concat([new_pivoted_df, temp_level], axis=0)
 
     return new_pivoted_df
+
+
+def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
+    """
+    Extends the given dataframe to include the hierarchical format.
+
+    Args:
+        df (pd.DataFrame):
+            The original dataframe.
+        h_format (pd.DataFrame):
+            The hierarchical schema.
+            It is extracted using the extract_hierarchical_structure function
+        sort_by (bool, optional):
+            If True, the dataframe is sorted by the hierarchical format.
+            Defaults to True.
+            Lower levels are sorted first.
+        format (str, optional):
+            The format of the original dataframe.
+            It can be either 'pivoted' or 'transactional'.
+            Defaults to 'pivoted'.
+
+    Returns:
+        df (pd.DataFrame):
+            The extended dataframe in transactional format.
+
+    """
+
+    # create a categorical data type with the true order
+    # Used for sorting the dataframe
+    cat_dtype = pd.api.types.CategoricalDtype(
+        categories=h_format.columns.values, ordered=True
+    )
+
+    # Prepare the hierarchical format
+    # Collapse the hierarchical format
+    h_format = h_format.stack().reset_index()
+
+    # Keep only level_1 and 0
+    h_format = h_format[["level_1", 0]]
+
+    # drop Duplicates
+    h_format = h_format.drop_duplicates(subset=[0])
+
+    # rename
+    h_format = h_format.rename(
+        columns={"level_1": "cross_sectional_level", 0: "unique_id"}
+    )
+
+    # Prepare the original df
+    df = transaction_df(df) if format == "pivoted" else df
+
+    # Merge on unique_id
+    df = df.merge(h_format, on="unique_id", how="left")
+
+    # Sort by level if true
+    if sort_by:
+        # convert the "levels" column to the categorical data type
+        df["cross_sectional_level"] = df["cross_sectional_level"].astype(cat_dtype)
+
+        # sort the dataframe based on the "levels" column
+        df = df.sort_values(by="cross_sectional_level")
+
+    # Return
+    return df
