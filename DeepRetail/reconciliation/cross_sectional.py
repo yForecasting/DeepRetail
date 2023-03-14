@@ -465,6 +465,7 @@ class CrossSectionalReconciler(object):
                 raise ValueError(
                     "When using the custom method, you need to provide a custom G matrix"
                 )
+            self.W_mat = None
 
         # Extract the values from the smat
         S_mat_vals = self.S_mat.values
