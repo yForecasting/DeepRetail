@@ -657,7 +657,7 @@ class THieF(object):
                 self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
             }
 
-    def predict(self, models, to_return=True):
+    def predict(self, models, to_return=True, n_jobs=1):
         """
         Generates base forecasts for each temporal level
 
@@ -670,6 +670,9 @@ class THieF(object):
             to_return (bool, optional):
                 Whether to return the base forecasts or not.
                 Default is True
+            n_jobs (int, optional):
+                The number of cores to run in parallel.
+                Default is 1.
 
         Returns:
             pd.DataFrame:
@@ -704,7 +707,7 @@ class THieF(object):
                 # Currently only supporting StatisticalForecaster
                 self.base_forecasters = {
                     factor: StatisticalForecaster(
-                        models=models[factor], freq=self.resampled_factors[i]
+                        models=models[factor], freq=self.resampled_factors[i], n_jobs=n_jobs
                     )
                     for i, factor in enumerate(self.factors)
                 }
@@ -770,7 +773,7 @@ class THieF(object):
             # Currently only supporting StatisticalForecaster
             self.base_forecasters = {
                 factor: StatisticalForecaster(
-                    models=models[factor], freq=self.resampled_factors[i]
+                    models=models[factor], freq=self.resampled_factors[i], n_jobs=n_jobs
                 )
                 for i, factor in enumerate(self.factors)
             }
