@@ -202,7 +202,7 @@ class CHieF(object):
             self.original_df, self.hierarchical_format, format=self.format
         )
 
-    def predict(self, models):
+    def predict(self, models, n_jobs=1):
         """
         Computes base forecasts for all hierarchical levels given the selected model
         In newer versions, user will select which model they want for every level
@@ -210,6 +210,9 @@ class CHieF(object):
         Args:
             models (list):
                 A list with the models to use for producing base forecasts
+            n_jobs (int, optional):
+                The number of cores to run in parallel.
+                Defaults to 1.
 
         Returns:
             base_forecasts (pd.DataFrame):
@@ -220,7 +223,7 @@ class CHieF(object):
 
         # Define the forecaster
         self.base_forecaster = StatisticalForecaster(
-            models=models, freq=self.bottom_level_freq
+            models=models, freq=self.bottom_level_freq, n_jobs=n_jobs
         )
 
         # Fit the forecaster
