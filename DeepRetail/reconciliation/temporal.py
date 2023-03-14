@@ -82,7 +82,9 @@ class TemporalReconciler(object):
         >>> reconciled = temporal_reconciler.reconcile('struc')
     """
 
-    def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+    def __init__(
+        self, bottom_level_freq, factors=None, top_fh=1, holdout=False, cv=None
+    ):
         """
         Initializes the TemporalReconciler class.
 
@@ -93,6 +95,8 @@ class TemporalReconciler(object):
                 Should be given if bottom_freq is not given.
             top_fh (int, optional): The forecast horizon of the top level forecasts.
                 The default is 1.
+            holdout (bool, optional): Whether to use holdout or not.
+            cv (int, optional): The number of folds to use for holdout.
 
         Raises:
             TypeError: If neither factors nor bottom_freq is given.
@@ -126,6 +130,11 @@ class TemporalReconciler(object):
 
         # Construct the Smat
         self.Smat = compute_matrix_S_temporal(self.factors)
+
+        self.holdout = holdout
+        if cv is None:
+            cv = 1
+        self.cv = cv
 
     def get_reconciliation_format(self):
         """
@@ -206,13 +215,13 @@ class TemporalReconciler(object):
 
             # Groupby unique_id, temporal_level and fh and get the Mean Squared Error
             residual_df = (
-                residual_df.groupby(["unique_id", "temporal_level", "fh"])
+                residual_df.groupby(["unique_id", "temporal_level"])
                 .agg({"residual_squarred": "mean"})
                 .reset_index()
             )
 
             # Get the matrix W
-            Wmat = get_w_matrix_mse(residual_df)
+            Wmat = get_w_matrix_mse(residual_df, self.factors)
 
         elif reconciliation_method == "variance":
             ...
@@ -306,20 +315,17 @@ class TemporalReconciler(object):
 
         return reco_df
 
-    def fit(self, base_fc_df, holdout=False, cv=None):
+    def fit(self, base_fc_df):
         """
         Fits the reconciler on the given dataframe of base forecasts
 
         Args:
             base_fc_df (pandas.DataFrame): The dataframe of base forecasts.
-            holdout (bool, optional): Whether to use holdout or not.
-            cv (int, optional): The number of folds to use for holdout.
+
 
         Returns:
             None
         """
-        self.holdout = holdout
-        self.cv = cv
 
         # if we have holdout:
         if self.holdout:
@@ -345,12 +351,12 @@ class TemporalReconciler(object):
             # Converts to the right forecast format
             self.reconciliation_ready_df = self.get_reconciliation_format()
 
-    def reconcile(self, reconciliation_method, residual_df=None):
+    def reconcile(self, method, residual_df=None):
         """
         Reconciles the base forecasts.
 
         Args:
-            reconciliation_method (str): The reconciliation method to use.
+            method (str): The reconciliation method to use.
             residual_df (pandas.DataFrame, optional): The dataframe of residuals.
 
         Returns:
@@ -373,7 +379,7 @@ class TemporalReconciler(object):
 
                 # Get the Weight matrix
                 self.Wmat = self.compute_matrix_W(
-                    reconciliation_method, residual_df=temp_residual_df
+                    method, residual_df=temp_residual_df
                 )
 
                 # Reconciles
@@ -381,7 +387,7 @@ class TemporalReconciler(object):
 
                 # reverses the format
                 self.reconciled_df = self.reverse_reconciliation_format(
-                    reconciliation_method
+                    method
                 )
 
                 # Add the cv
@@ -406,7 +412,7 @@ class TemporalReconciler(object):
         else:
             # Get the Weight matrix
             self.Wmat = self.compute_matrix_W(
-                reconciliation_method, residual_df=residual_df
+                method, residual_df=residual_df
             )
 
             # Reconciles
@@ -414,7 +420,7 @@ class TemporalReconciler(object):
 
             # reverses the format
             self.reconciled_df = self.reverse_reconciliation_format(
-                reconciliation_method
+                method
             )
 
         return self.reconciled_df
@@ -489,7 +495,9 @@ class THieF(object):
 
     """
 
-    def __init__(self, bottom_level_freq, factors=None, top_fh=1):
+    def __init__(
+        self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None
+    ):
         """
         Initializes the THieF class.
         It constructs the temporal levels and assigns fundamental parameters.
@@ -502,6 +510,10 @@ class THieF(object):
                 The factors to use for the temporal levels.
             top_fh (int, optional):
                 The top forecast horizon.
+            holdout (bool, optional):
+                Whether to use holdout or not.
+            cv (int, optional):
+                The number of folds to use for holdout.
 
         Returns:
             None
@@ -542,7 +554,13 @@ class THieF(object):
         # Construct the Smat
         self.Smat = compute_matrix_S_temporal(self.factors)
 
-    def fit(self, original_df, holdout=True, cv=None, format="pivoted"):
+        # add the holdout and the cv
+        self.holdout = holdout
+        if cv is None:
+            self.cv = 1
+        self.cv = cv
+
+    def fit(self, original_df, format="pivoted"):
         """
         Fits the model on the given dataframe.
         The functions prepares the input dataframe to the right format.
@@ -550,10 +568,6 @@ class THieF(object):
         Args:
             original_df (pd.DataFrame):
                 The original dataframe.
-            holdout (bool, optional):
-                Whether to use holdout or not.
-            cv (int, optional):
-                The number of folds to use for holdout.
             format (str, optional):
                 The format of the input dataframe.
                 It can be either 'pivoted' or 'transaction'.
@@ -565,10 +579,7 @@ class THieF(object):
 
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
-
         self.original_df = original_df
-        self.holdout = holdout
-        self.cv = cv
 
         # If we have holdout:
         if self.holdout:
@@ -584,7 +595,7 @@ class THieF(object):
                 # Manual cross-validation
                 # Define start and end points for each fold
                 temp_startpoint = end_point - z
-                temp_endpoint = cv - z - 1
+                temp_endpoint = self.cv - z - 1
 
                 # Split
                 temp_test_df = (
@@ -774,7 +785,7 @@ class THieF(object):
             # Generate base forecasts
             temp_base_forecasts = {
                 factor: self.base_forecasters[factor].predict(
-                    h=self.frequencies[i], holdout=False
+                    h=self.frequencies[i], holdout=False,
                 )
                 for i, factor in enumerate(self.factors)
             }
@@ -823,6 +834,9 @@ class THieF(object):
             .rename(columns={"level_0": "temporal_level"})
         )
 
+        # Calculate residuals
+        # temp_residuals["residual"] = temp_residuals["y_true"] - temp_residuals["y_pred"]
+
         # keep only relevant columns
         to_keep = ["temporal_level", "unique_id", "cv", "fh", "Model", "residual"]
 
@@ -831,12 +845,12 @@ class THieF(object):
 
         return temp_residuals[to_keep]
 
-    def reconcile(self, reconciliation_method):
+    def reconcile(self, method):
         """
         Reconciles base forecasts using the TemporalReconciler.
 
         Args:
-            reconciliation_method (str):
+            method (str):
                 The method to use for reconciliation.
                 Currently only supporting "struc".
 
@@ -851,17 +865,18 @@ class THieF(object):
 
         # Define the TemporalReconciler
         self.temporal_reconciler = TemporalReconciler(
-            bottom_level_freq=self.bottom_level_freq, factors=self.factors
+            bottom_level_freq=self.bottom_level_freq,
+            factors=self.factors,
+            holdout=self.holdout,
+            cv=self.cv,
         )
 
         # Fit the reconciler
-        self.temporal_reconciler.fit(
-            self.base_forecasts, holdout=self.holdout, cv=self.cv
-        )
+        self.temporal_reconciler.fit(self.base_forecasts)
 
         # Reconcile
         self.reconciled_df = self.temporal_reconciler.reconcile(
-            reconciliation_method, residual_df=self.base_forecast_residuals
+            method, residual_df=self.base_forecast_residuals
         )
 
         # Merge with the base forecasts

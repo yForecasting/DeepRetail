@@ -207,7 +207,7 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
     ).sum()
 
     # change the frequency of the columns to the resampled_freq
-    resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
+    # resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
 
     return resample_df
 
@@ -313,8 +313,17 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     # The full format of the matrix is like that
     # S * (S_T * W_inv * S)^-1 S_T * W_inv * pred
 
-    # First get the A = S_T * W_inv * S
-    A = Smat.T @ Wmat @ Smat
+    # First we inverse W
+    try:
+        W_inv = np.linalg.inv(Wmat)
+    except np.linalg.LinAlgError:
+        # A fallback in case the matrix is not invertible due to det = 0
+        # This is the pseudo inverse of W
+        # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
+        W_inv = np.linalg.pinv(Wmat)
+
+    # Then get the A = S_T * W_inv * S
+    A = Smat.T @ W_inv @ Smat
 
     # Inverse A
     try:
@@ -331,7 +340,7 @@ def compute_y_tilde(y_hat, Smat, Wmat):
 
     # Now we have: B * W_inv * pred
     # First take the B * W_inv
-    C = B @ Wmat
+    C = B @ W_inv
 
     # Now we have: C * pred
     y_tilde = C @ y_hat
@@ -339,12 +348,13 @@ def compute_y_tilde(y_hat, Smat, Wmat):
     return y_tilde
 
 
-def get_w_matrix_mse(res_df):
+def get_w_matrix_mse(res_df, factors):
     """
     Get the W matrix for MSE scaling
 
     Args:
         res_df (pandas.DataFrame): a pandas DataFrame containing the residuals
+        factors (list): a list of factors for the temporal levels
 
     Returns:
         numpy.ndarray: a numpy array representing the W matrix
@@ -360,9 +370,10 @@ def get_w_matrix_mse(res_df):
 
         # Get them on the right order
         # sort temp_df descending based on temporal_level first and ascending based on fh
-        temp_df = temp_df.sort_values(
-            by=["temporal_level", "fh"], ascending=[False, True]
-        )
+        temp_df = temp_df.sort_values(by=["temporal_level"], ascending=[False])
+
+        # repeat rows based  on the number of factors column
+        temp_df = temp_df.loc[np.repeat(temp_df.index.values, factors)]
 
         # take the values of the mse
         temp_mse = temp_df["residual_squarred"].values
@@ -370,6 +381,12 @@ def get_w_matrix_mse(res_df):
         temp_weights = 1 / temp_mse
         # Convert to diagonal matrix
         temp_W = np.diag(temp_weights)
+        # Ensure no infs or nans.
+        # If exist convert to 0
+        # temp_weights[np.isinf(temp_weights)] = 0
+        # temp_weights[np.isnan(temp_weights)] = 0
+        # Replace inf with zeros
+        temp_W = np.nan_to_num(temp_W)
 
         # Initialize matrix if it does not exist
         if i == 0:
@@ -420,3 +437,105 @@ def compute_matrix_S_cross_sectional(df):
     S = S.sort_index(axis=1)
 
     return S
+
+
+def cross_product(x):
+    """
+    Returns the cross product of a vector
+
+    Args:
+        x (np.array): vector
+            The vector to calculate the cross product of
+
+    Returns:
+        cross_product (np.array): cross product of the vector
+    """
+
+    return x.T @ x
+
+
+def cov2corr(cov, return_std=None):
+    """
+    Function to convert a covariance matrix to a correlation matrix
+
+    Args:
+        cov (np.array): covariance matrix
+        return_std (bool): if True, return the standard deviation of the variables
+
+    Returns:
+        corr (np.array): correlation matrix
+
+    References:
+        https://www.statsmodels.org/dev/_modules/statsmodels/stats/moment_helpers.html#cov2corr
+    """
+    # Calculate the standard deviation for each variable
+    std = np.sqrt(np.diag(cov))
+    # Calculate the correlation matrix
+    corr = cov / np.outer(std, std)
+
+    # corr[cov == 0] = 0
+    if return_std:
+        return corr, std
+    else:
+        return corr
+
+
+def shrink_estim(res, cov_mat):
+    """
+    Shrinkage of the covariance matrix according to Schäfer and Strimmer 2005
+
+    Args:
+        res (np.array): the matrix with the residuals
+        cov_mat (np.array): the covariance matrix of the residuals
+
+    Returns:
+        w_shr (np.array): the shrinked covariance matrix
+        lambda_ (float): the shrinkage parameter
+
+    References:
+        https://www.cs.princeton.edu/~bee/courses/read/schafer-SAGMB-2005.pdf
+        https://github.com/daniGiro/FoReco/blob/9ace22dd39e20a736600dfafcf29a89f89f90aca/R/shrink_estim.R
+        https://github.com/earowang/hts/blob/master/R/MinT.R
+
+    """
+
+    # Get the total number of time series
+    n = res.shape[0]
+
+    # Discard the off-diagonal elements
+    # result is a square matrix
+    tar = np.diag(np.diag(cov_mat))
+
+    # Get the correlation matrix
+    corm, res_std = cov2corr(cov_mat, return_std=True)
+    corm = np.nan_to_num(corm, nan=0.0)  # remove nans
+
+    # Standardize the data by dividing each column by the square root of its corresponding diagonal element
+    # in the covariance matrix
+    xs = np.divide(res, res_std, out=np.zeros_like(res), where=res_std != 0)
+    # nice trick to avoid division by zero
+    # reference: https://github.com/Nixtla/hierarchicalforecast/blob/main/hierarchicalforecast/methods.py
+
+    # remove rows with missing vals
+    xs = xs[~np.isnan(xs).any(axis=1), :]
+
+    # calculate v
+    v = (1 / (n * (n - 1))) * (
+        cross_product(xs**2) - (1 / n) * (cross_product(xs) ** 2)
+    )
+    # Set the diagonal elements to zero
+    np.fill_diagonal(v, 0)
+
+    # Get the correlation matrix on the off-diagonal elements
+    corapn = cov2corr(tar)
+    # Again deal with nans
+    corapn = np.nan_to_num(corapn, nan=0.0)
+    # Squared differences between the correlation matrices
+    d = (corm - corapn) ** 2
+
+    lambda_ = np.sum(v) / np.sum(d)
+    lambda_ = max(min(lambda_, 1), 0)
+
+    shrinked_cov = lambda_ * tar + (1 - lambda_) * cov_mat
+
+    return shrinked_cov, lambda_

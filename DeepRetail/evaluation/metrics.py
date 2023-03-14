@@ -1,9 +1,44 @@
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 import numpy as np
 
 # a small epsilon to avoid divisions with zero
 # todo: check statistical correctness
 e = np.finfo(np.float64).eps
+
+
+def mean_squared_error(actual, predicted, squared=True):
+    """
+    Calculates the mean squared error between actual and predicted values.
+
+    Args:
+        actual (np.array): The actual values.
+        predicted (np.array): The predicted values.
+        squared (bool): Whether to square the error. Default: True.
+
+    Returns:
+        np.array: The mean squared error.
+
+    """
+    squared_error = np.square(simple_error(actual, predicted))
+
+    if squared:
+        return np.mean(squared_error)
+    else:
+        return np.sqrt(np.mean(squared_error))
+
+
+def mean_absolute_error(actual, predicted):
+    """
+    Calculates the mean absolute error between actual and predicted values.
+
+    Args:
+        actual (np.array): The actual values.
+        predicted (np.array): The predicted values.
+
+    Returns:
+        np.array: The mean absolute error.
+    """
+    abs_error = np.abs(simple_error(actual, predicted))
+    return np.mean(abs_error)
 
 
 def simple_error(actual, predicted, *args, **kwargs):
