@@ -120,7 +120,7 @@ class Reader(object):
                 agg_func="sum",
                 fill_values=True,
             )
-        elif self.case == 6:
+        elif self.case == 5:
             temp_df = read_case_5(self.filepath)
 
             # pivot and resample
