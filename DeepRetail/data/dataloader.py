@@ -1,6 +1,7 @@
 import pandas as pd
 from DeepRetail.transformations.formats import transaction_df
 from DeepRetail.data.casereaders import read_case_0
+from collections import Counter
 
 
 class Reader(object):
@@ -170,3 +171,30 @@ class Reader(object):
             )
 
         return temp_df
+
+
+def fix_duplicate_cols(df):
+    """Fixes an issue with duplicate columns on chunk breas
+
+    Args:
+        df (pd.DataFrame): The dataframe to make the fixes
+    """
+
+    # Get the duplicate columns
+    duplicate_cols = [item for item, count in Counter(df.columns).items() if count > 1]
+
+    # Replace for every dup col
+    for col in duplicate_cols:
+        # Sum the duplicates
+        temp = df[col]
+        temp = temp.sum(axis=1)
+
+        # drop the old columns
+        df = df.drop(col, axis=1)
+        # Add the sum as the new col
+        df[col] = temp
+
+    # Convert to dt
+    df.columns = pd.to_datetime(df.columns)
+    df.columns = sorted(df.columns)  # sort
+    return df
