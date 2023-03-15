@@ -265,3 +265,48 @@ def read_case_3(read_filepath, calendar_filepath):
     df = df.loc[~(df == 0).all(axis=1)]
 
     return df
+
+
+def read_case_4(
+    read_filepath,
+):
+    """Reads data for case 4
+
+    Args:
+        read_filepath (str): Existing loocation of the data file
+    """
+
+    # Loading
+    df = pd.read_csv(read_filepath)
+
+    # Removing instances with bad status
+    ids = df[(df["Status"] == 4) | (df["Status"].isna()) | (df["Exclincl"] != 1)].index
+    df = df.drop(ids)
+
+    # Convert date to datetime
+    df["Datum"] = pd.to_datetime(df["Datum"])
+
+    # keep only sales
+    df = df[df["Trans"] == "VK"]
+    df["Inuit"] = df["Inuit"].astype(float)
+
+    # Group
+    df = df.groupby(["Groep", "Resource", "Datum"]).agg({"Inuit": "sum"}).reset_index()
+
+    # Convert to positive
+    df["Inuit"] = df["Inuit"] * -1
+
+    # Merge on the names to make the unique_id
+    # format: Shop - group
+    df["unique_id"] = [
+        str(shop) + "-" + str(group) for shop, group in zip(df["Resource"], df["Groep"])
+    ]
+
+    # Drop cols
+    df = df.drop(["Groep", "Resource"], axis=1)
+
+    # Change column names
+    cols = ["date", "y", "unique_id"]
+    df.columns = cols
+
+    return df
