@@ -1,6 +1,14 @@
 import pandas as pd
 from DeepRetail.transformations.formats import transaction_df
-from DeepRetail.data.casereaders import read_case_0
+from DeepRetail.data.casereaders import (
+    read_case_0,
+    read_case_1,
+    read_case_2,
+    read_case_3,
+    read_case_4,
+    read_case_5,
+)
+from DeepRetail.transformations.formats import pivoted_df
 from collections import Counter
 
 
@@ -11,7 +19,7 @@ class Reader(object):
 
     """
 
-    def __init__(self, filepath, calendar_filepath=None, case=0):
+    def __init__(self, filepath, calendar_filepath=None, case=0, temporary_save=False):
         """
         Initializes a Reader object.
 
@@ -30,6 +38,7 @@ class Reader(object):
         self.case = case
         self.filepath = filepath
         self.calendar_filepath = calendar_filepath
+        self.temporary_save = temporary_save
 
     def call_in_memory(
         self,
@@ -66,6 +75,61 @@ class Reader(object):
                 raise ValueError("Case 3 requires the calendar dataframe")
             # read
             temp_df = read_case_0(self.filepath, self.calendar_filepath)
+
+        if self.case == 1:
+            # For case 1 -> we first read the data in the folder
+            temp_df = read_case_1(
+                self.filepath, self.save_filepath, self.frequency, self.temporary_save
+            )
+            # converts columns to str to fix a bug
+            temp_df.columns = pd.to_datetime(temp_df.columns).astype(str)
+
+            # Fix duplicates
+            temp_df = fix_duplicate_cols(temp_df)
+
+        elif self.case == 2:
+            # For case 2 -> read
+            temp_df = read_case_2(self.filepath)
+
+            # pivot and resample
+            temp_df = pivoted_df(
+                df=temp_df,
+                target_frequency=self.frequency,
+                agg_func="sum",
+                fill_values=True,
+            )
+        elif self.case == 3:
+            # read data
+            temp_df = read_case_3(self.filepath)
+
+            # pivot and resample
+            temp_df = pivoted_df(
+                df=temp_df,
+                target_frequency=self.frequency,
+                agg_func="sum",
+                fill_values=True,
+            )
+        elif self.case == 4:
+            # read
+            temp_df = read_case_4(self.filepath)
+
+            # pivot and resample
+            temp_df = pivoted_df(
+                df=temp_df,
+                target_frequency=self.frequency,
+                agg_func="sum",
+                fill_values=True,
+            )
+        elif self.case == 6:
+            temp_df = read_case_5(self.filepath)
+
+            # pivot and resample
+            temp_df = pivoted_df(
+                df=temp_df,
+                target_frequency=self.frequency,
+                agg_func="sum",
+                fill_values=True,
+            )
 
         # filter negatives
         if filter_negatives:
