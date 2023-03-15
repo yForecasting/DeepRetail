@@ -378,3 +378,163 @@ def remove_gifts(p, q):
         return 1
     else:
         return 0
+
+
+def read_case_6(read_filepath):
+    """Reads data for case 6
+
+    Args:
+        read_filepath (str): Existing loocation of the data file
+    """
+    # read
+    xl = pd.ExcelFile(read_filepath)
+    # take the sheets
+    df = pd.read_excel(xl, "TRANSACTIONS")
+    products = pd.read_excel(xl, "PRODUCT_MASTER")
+
+    # clean memory
+    del xl
+    gc.collect()
+
+    # Fix the dates on order/invoice
+    df["ORDER_DATE"] = pd.to_datetime(
+        [item.split(" ")[0] for item in df["ORDER_DATE"].values]
+    )
+    df["INVOICE_DATE"] = pd.to_datetime(
+        [item.split(" ")[0] for item in df["INVOICE_DATE"].values]
+    )
+
+    # Following steps clean data
+    # For detailed explanations head to the case specific read notebook
+
+    # Remove some special items delivered to a single person
+    df = df[~df["PRODUCT_CODE"].str.startswith("D")]
+
+    # remove some promotion items based on a flag
+    df["gift"] = df.apply(
+        lambda row: remove_gifts(row["EUR_INVOICED"], row["QTY_INVOICED"]), axis=1
+    )
+    df = df[df["gift"] == 0]
+    df = df.drop("gift", axis=1)
+
+    # summing to drop some negative alues
+    groupby_to = [
+        "ORDER_DATE",
+        "INVOICE_DATE",
+        "ORDER_LINE",
+        "PRODUCT_CODE",
+        "SHIPTO_CODE",
+    ]
+    df = (
+        df.groupby(groupby_to)
+        .agg(
+            {
+                "QTY_INVOICED": "sum",
+                "EUR_INVOICED": "sum",
+                "ORDERNR": "first",
+                "BILLTO_CODE": "first",
+            }
+        )
+        .reset_index()
+    )
+
+    # The idea is to correct negative values by grouping on specific columns
+    # Details on the full dataframe
+
+    df["FullOrder"] = [re.sub("\D", "", d) for d in df["ORDERNR"]]  # noqa: W605
+    to_group = ["ORDER_DATE", "ORDER_LINE", "PRODUCT_CODE", "SHIPTO_CODE", "FullOrder"]
+    df = df.groupby(to_group).agg({"QTY_INVOICED": "sum"}).reset_index()
+
+    # Repeat
+    to_group = ["ORDER_LINE", "PRODUCT_CODE", "SHIPTO_CODE", "FullOrder"]
+    df = (
+        df.groupby(to_group)
+        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "last"})
+        .reset_index()
+    )
+
+    # Group again
+    to_group = ["PRODUCT_CODE", "SHIPTO_CODE", "FullOrder", "ORDER_DATE"]
+    df = df.groupby(to_group).agg({"QTY_INVOICED": "sum"}).reset_index()
+
+    # Group again
+    to_group = ["PRODUCT_CODE", "SHIPTO_CODE", "FullOrder"]
+    df = (
+        df.groupby(to_group)
+        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first"})
+        .reset_index()
+    )
+
+    # Group again
+    to_group = ["PRODUCT_CODE", "FullOrder"]
+    df = (
+        df.groupby(to_group)
+        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first", "SHIPTO_CODE": "first"})
+        .reset_index()
+    )
+
+    # After making the corrections droping some extra negative values
+    df = df[df["QTY_INVOICED"] > 0]
+
+    # correcting some typos
+    # Make the corrections manualy as they are only 3
+    change_date = "12-05-2021"
+    change_date = datetime.datetime.strptime(change_date, "%d-%m-%Y")
+    df.loc[665397, "ORDER_DATE"] = change_date
+
+    change_date = "16-12-2021"
+    change_date = datetime.datetime.strptime(change_date, "%d-%m-%Y")
+    df.loc[416822, "ORDER_DATE"] = change_date
+
+    change_date = "03-11-2014"
+    change_date = datetime.datetime.strptime(change_date, "%d-%m-%Y")
+    df.loc[4237, "ORDER_DATE"] = change_date
+    df.loc[142, "ORDER_DATE"] = change_date
+
+    # I am interested not in boxes but in items.
+    # So I have to get how many items in each box
+
+    # Del first line in products
+    products = products.iloc[1:, :]
+    # remove bad products
+    products = products[~products["PRODUCT_CODE"].str.startswith("D")]
+
+    # Make some splits based on the id format
+    ids = products["PRODUCT_CODE"].values
+
+    # Appending the info to the df
+    products.loc[:, "Family_Code"] = [id[:2] for id in ids]
+    products.loc[:, "Sr_Num"] = [id[2:5] for id in ids]
+    products.loc[:, "Cigars_Num"] = [int(id[5:8]) for id in ids]
+
+    # Adding any extra information. For example DF -> duty free
+    products.loc[:, "Extras"] = [id[11:] if len(id) > 11 else np.nan for id in ids]
+
+    # Drop a duplicate column
+    products = products.drop("AANTAL_SIG", axis=1)
+
+    # take items per products
+    print(products.columns)
+    item_per_prod = products[["PRODUCT_CODE", "Cigars_Num", "FAM"]]
+
+    # Adding the number of cigars per product!
+    df = pd.merge(df, item_per_prod, on="PRODUCT_CODE", how="left")
+    # Multiply to get the cigars => the actual sales!
+    df["Sales"] = df["QTY_INVOICED"] * df["Cigars_Num"]
+    # Drop used columns
+    df = df.drop(["Cigars_Num", "QTY_INVOICED"], axis=1)
+
+    # groupby on product level
+    df["product_id"] = [id.split("-")[0] for id in df["PRODUCT_CODE"]]
+
+    # Add the family:
+    df["product_id"] = [
+        str(fam) + str(id) for fam, id in zip(df["FAM"], df["product_id"])
+    ]
+
+    df = df.groupby(["product_id", "ORDER_DATE"]).agg({"Sales": "sum"}).reset_index()
+
+    # keep columns
+    cols = ["unique_id", "date", "y"]
+    df.columns = cols
+    return df
