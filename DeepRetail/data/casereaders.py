@@ -267,3 +267,98 @@ def read_case_3(
     df.columns = cols
 
     return df
+
+
+def read_case_4(read_filepath):
+    """Reads data for case 5
+
+    Args:
+        read_filepath (str): Existing loocation of the data file
+    """
+    # Loading
+    df = pd.read_excel(read_filepath, skiprows=9)
+
+    # Drop two columns
+    df = df.drop(["Unnamed: 0", "Unnamed: 2"], axis=1)
+
+    # We focus on sales
+    df = df[df["Status"] == "Gewonnen"]
+
+    # Editting the items names
+    # Convert to str and titlecase
+    df.loc[:, "Modellen van interesse"] = (
+        df["Modellen van interesse"].astype(str).str.title()
+    )
+    df["Merk"] = df["Merk"].astype(str).str.title()
+
+    # Keep only the last item shown in case it is of the right brand
+    df.loc[:, "Modellen van interesse"] = [
+        [i for i in a.split(",") if str(b) in i]
+        for a, b in zip(df["Modellen van interesse"], df["Merk"])
+    ]
+    df.loc[:, "Keep"] = [len(a) for a in df["Modellen van interesse"].values]
+    df = df[df["Keep"] > 0]
+    df["Modellen van interesse"] = [
+        item[0] for item in df["Modellen van interesse"].values
+    ]
+
+    # Remove brands without naming
+    df.loc[:, "Keep"] = [len(a.split(" ")) for a in df["Modellen van interesse"].values]
+    df = df[df["Keep"] > 1]
+
+    # Fix issues with some items
+    df.loc[:, "Modellen van interesse"] = [
+        " ".join(a.split(" ")[1:]) if a.split(" ")[1] == "Audi" else a
+        for a in df["Modellen van interesse"].values
+    ]
+
+    # fix the issue with RS 6 and RS6, merge characters if a number is after a letter
+    df.loc[:, "Modellen van interesse"] = [
+        " ".join(
+            [
+                "".join([a.split(" ")[i], a.split(" ")[i + 1]])
+                if a.split(" ")[i + 1].isdigit()
+                else a.split(" ")[i]
+                for i in range(len(a.split(" ")) - 1)
+            ]
+            + [a.split(" ")[-1]]
+        )
+        for a in df["Modellen van interesse"].values
+    ]
+
+    # Manualy replace some values for a car
+    df.loc[:, "Modellen van interesse"] = df.loc[
+        :, "Modellen van interesse"
+    ].str.replace("!", " ")
+    df.loc[:, "Modellen van interesse"] = df.loc[
+        :, "Modellen van interesse"
+    ].str.replace("Multivan77", "Multivan")
+    df.loc[:, "Modellen van interesse"] = df.loc[
+        :, "Modellen van interesse"
+    ].str.replace("Multivan7", "Multivan")
+
+    # keep onl standard models not extras
+    df.loc[:, "Modellen van interesse"] = [
+        " ".join(a.split(" ")[:2]) for a in df["Modellen van interesse"].values
+    ]
+
+    # Add the sale
+    df.loc[:, "Sale"] = 1
+
+    # Edit dates
+    df.loc[:, "Aanmaakdatum"] = pd.to_datetime(df["Aanmaakdatum"], format="%d/%m/%Y")
+
+    # Pick a specific start date
+    start_date = datetime.datetime.strptime("01-12-2016", "%d-%m-%Y")
+    df = df[df["Aanmaakdatum"] > start_date]
+
+    # Keep only relevant columns
+    cols = ["Aanmaakdatum", "Modellen van interesse", "Sale"]
+    renamed_cols = ["date", "unique_id", "y"]
+    df = df[cols]
+    df.columns = renamed_cols
+
+    # Aggregate
+    df = df.groupby(["date", "unique_id"]).sum().reset_index()
+
+    return df
