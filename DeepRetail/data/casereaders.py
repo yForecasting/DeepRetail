@@ -380,8 +380,8 @@ def remove_gifts(p, q):
         return 0
 
 
-def read_case_6(read_filepath):
-    """Reads data for case 6
+def read_case_5(read_filepath):
+    """Reads data for case 5
 
     Args:
         read_filepath (str): Existing loocation of the data file
