@@ -12,6 +12,323 @@ from DeepRetail.reconciliation.utils import convert_offset_to_lower_freq, get_fa
 # surpress warnings
 warnings.filterwarnings("ignore")
 
+
+class C_THieF(object):
+    """
+    A class for Cross-Temporal Hierarchical Forecasting (C-THieF) algorithm.
+
+    The flow of the class is the following:
+    (1) Extend the input dataframe to include the hierarchical format
+    (2) Build temporal levels for every time series in the extended hierarchy.
+    (3) Generate Base Forecasts for every Temporal Level on all Cross-Sections
+    (4) Reconcile Temporally each unique cross-sectional (define k THieFs for k cross-sections)
+    (5) Define a Cross-Sectional Reconciler for every temporal level (n CHieFS for n temporal levels)
+    (6) Extract the G matrix of every Cross-Sectional Reconciler
+    (7) Take the average of the G matrices: G_bar = sum(G)/n
+    (8) Reconcile the temporaly-reconciled forecasts of step (4) using G_bar as the reconciliation matr
+    (9) Multiply the cross-sectionaly reconciled forecasts with the Temporal S_mat to get temporal coherence.
+
+
+    For the available reconcilation methods refer to the Cross-Temporal Reconciliation class
+
+    Args:
+        bottom_level_freq (str):
+            The frequency of the bottom level time series.
+        factors (list):
+            A list of factors to be used for the reconciliation.
+            Default is None and factors are estimated automaticaly.
+        holdout (bool):
+            Whether to use holdout or not.
+            Default is True.
+        cv (int):
+            The number of cross-validation folds.
+            Default is None.
+        df (pd.DataFrame):
+            Dataframe with the original time series
+        current_format (list):
+            The current format of the schema on the unique_id
+            For example ['top_level', 'middle_level', 'bottom_level']
+        corrected_format (list):
+            The corrected format of the schema on the unique_id
+            For example ['top_level', 'middle_level', 'bottom_level']
+        splitter (str):
+            The splitter used to separate the unique_id into the different levels
+            For example '_'
+        add_total (bool):
+            Whether to add a total column to the dataframe
+            Default is True
+        models (list,str):
+            The models to be used for the forecasting
+        temporal_methods (str):
+            The method to be used for the temporal reconciliation
+            Refer to the CrossTemporalReconciler class for the available methods
+        cross_sectional_methods (str):
+            The method to be used for the cross-sectional reconciliation
+            Refer to the CrossTemporallReconciler class for the available methods
+
+    Methods:
+        fit:
+            Fits the C_THieF algorithm on the input dataframe.
+        predict:
+            Predicts the base forecasts for all temporal and cross-temporal levels
+        reconcile:
+            Reconciles the base forecasts using the CrossTemporalReconciler
+
+    Returns:
+        base_forecasts (pd.DataFrame):
+            The base forecasts for all temporal and cross-temporal levels
+        reconciled_forecasts (pd.DataFrame):
+            The reconciled forecasts for all temporal and cross-temporal levels
+
+
+    Examples:
+        >>> from DeepRetail.reconciliation.cross_temporal import C_THieF
+
+        >>> # Arguments for the schema of the cross-sectional hierarchy
+        >>> # Arguments:
+        >>> current = ['cat', 'catnum', 'itemnum', 'storenum']
+        >>> correct = ['itemnum', 'catnum', 'cat', 'storenum']
+        >>> splitter = "_"
+        >>> total = False
+
+        >>> # ARguments for the schema of the temporal hierarchy
+        >>> freq = 'M'
+        >>> h = 12
+
+        >>> # No hold-out
+        >>> holdout = False
+        >>> cv = None
+
+        >>> # Define the object
+        >>> ct = C_THieF(bottom_level_freq=freq, holdout = holdout, cv = cv)
+
+        >>> # Fit to build the hierarchical structures
+        >>> ct.fit(df = sample_df,
+        >>>     current_format = current,
+        >>>     corrected_format = correct,
+        >>>     splitter = splitter,
+        >>>     add_total = total,
+        >>>     format = 'pivoted')
+
+        >>> # Generate base forecasts for each cross-sectional and temporal level
+        >>> models = 'ETS'
+        >>> base_forecasts = ct.predict(models = models)
+
+        >>> # Now we reconcile
+        >>> # Will use the simplest structaral scalling for both here
+        >>> ct_reconciled = ct.reconcile(temporal_method = 'struc', cross_sectional_method = 'struc')
+
+
+    References:
+        Kourentzes, N., & Athanasopoulos, G. (2019).
+        Cross-temporal coherent forecasts for Australian tourism.
+        Annals of Tourism Research, 75, 393–409. [DOI]
+
+
+    """
+
+    def __init__(self, bottom_level_freq, factors=None, holdout=True, cv=None):
+        """
+        Initialize the C_THieF class.
+        Extracts the important parameters for THieF and CHieF classes
+        Note:
+        Currently we dont support multi-step ahead forecasting.
+        We only support 1-step ahead forecasting.
+
+
+        Args:
+            bottom_level_freq (str):
+                The frequency of the bottom level time series.
+            factors (list):
+                A list of factors to be used for the reconciliation.
+                Default is None and factors are estimated automaticaly.
+            holdout (bool):
+                Whether to use holdout or not.
+                Default is True.
+            cv (int):
+                The number of cross-validation folds.
+                Default is None.
+
+        Returns:
+            None
+
+        """
+
+        self.bottom_level_freq = bottom_level_freq
+        # Currently only supports 1-period ahead forecasting.
+        self.h = get_numeric_frequency(self.bottom_level_freq)
+        self.holdout = holdout
+        self.factors = factors
+
+        if cv is None:
+            self.cv = 1
+        self.cv = cv
+
+    def fit(
+        self,
+        df,
+        current_format,
+        corrected_format,
+        splitter,
+        add_total=True,
+        format="pivoted",
+    ):
+        """
+        Fits the C_THieF algorithm on the input dataframe.
+        In particular, it extracts ...
+
+        Args:
+            df (pd.DataFrame):
+                Dataframe with the original time series
+            current_format (list):
+                The current format of the schema on the unique_id
+                For example ['top_level', 'middle_level', 'bottom_level']
+            corrected_format (list):
+                A list with the levels orders in the right order
+                Lower levels are first.
+                For example ['bottom_level', 'middle_level', 'top_level']
+            splitter (str):
+                The splitter used to separate the levels on the unique_id
+                For example '_'
+            add_total (bool, optional):
+                Whether to add a total column to the dataframe.
+                The higher level that aggregates everything.
+                Defaults to True.
+            format (str, optional):
+                The format of the dataframe.
+                Options are "pivoted" or "transaction".
+                Defaults to "pivoted".
+
+        Returns:
+            None
+        """
+
+        self.original_df = df
+
+        # Define the initial CHieF to extract the hiearchical information
+        main_CHieF = CHieF(
+            bottom_level_freq=self.bottom_level_freq,
+            h=self.h,
+            holdout=self.holdout,
+            cv=self.cv,
+        )
+
+        # Fit the initial CHieF
+        main_CHieF.fit(
+            df,
+            current_format,
+            corrected_format,
+            splitter,
+            add_total=add_total,
+            format=format,
+        )
+
+        # Extract the hierarchical information
+        self.h_df, self.h_format, self.s_mat_cross = (
+            main_CHieF.cross_sectional_df,
+            main_CHieF.hierarchical_format,
+            main_CHieF.S_mat,
+        )
+
+    def predict(self, models):
+        """
+        Generates base forecasts for each temporal level on every cross-section
+
+        Args:
+            models (str or dict):
+                The models to use for each temporal level.
+                It can be either a string or a dictionary.
+                If it is a string, the same model will be used for all temporal levels.
+                If it is a dictionary, the keys should be the temporal levels and the values the models.
+
+        Returns:
+            base_fc (pd.DataFrame):
+                The base forecasts for each temporal level.
+        """
+
+        # generates base forecasts
+        # models is str or list dictionary for each factor & cross-section
+        # This is to be worked and will be added in the next version
+
+        # Check if we have a model for each level
+        if self.factors is None:
+            total_factors = get_factors(get_numeric_frequency(self.bottom_level_freq))
+        if isinstance(models, str):
+            # If not, use the same model for all levels
+            models = {i: models for i in total_factors}
+        # Check if we have enough models
+        elif len(models) != len(total_factors):
+            raise ValueError(
+                "The number of models should be equal to the number of factors"
+            )
+
+        # Define and fit the initial THieF
+        self.main_THieF = THieF(
+            bottom_level_freq=self.bottom_level_freq, holdout=self.holdout, cv=self.cv
+        )
+
+        # fit thief to the entire hierarchical df
+        self.main_THieF.fit(self.h_df, format="pivoted")  # format is always pivoted
+
+        # Get base forecasts and residuals
+        self.base_fc = self.main_THieF.predict(models)
+
+        # Get residuals
+        self.residuals = self.main_THieF.base_forecast_residuals
+
+        # Extend base forecasts to include the cross-sectional hierarchical format
+        self.base_fc = hierarchical_to_transaction(
+            self.base_fc, self.h_format, format="transaction"
+        )  # format always transaction
+
+        # extend residuals too
+        self.residuals = hierarchical_to_transaction(
+            self.residuals, self.h_format, format="transaction"
+        )  # format always transaction
+
+        # Return
+        return self.base_fc
+
+    def reconcile(self, temporal_method, cross_sectional_method):
+        """
+        Performs Cross-Temporal Reconciliation as described in Kourentzes & Athanasopoulos (2019)
+        For details refer to the reconciler class
+
+        Args:
+            temporal_method (str):
+                The method to use for temporal reconciliation.
+                Currently Supports: mse and struc
+                For details refer to the TemporalReconciler class
+            cross_sectional_method (str):
+                The method to use for cross-sectional reconciliation.
+                Currently Supports: ols, struc, mse, var, shrink and sam
+                For details refer to the CrossSectionalReconciler class
+
+        Returns:
+            reconciled_fc (pd.DataFrame):
+                The reconciled forecasts for each temporal and cross-sectional level.
+
+        """
+
+        # Define the reconciler
+        ct_reco = CrossTemporalReconciler(
+            self.bottom_level_freq, self.h, holdout=self.holdout, cv=self.cv
+        )
+
+        # Fit the reconciler
+        ct_reco.fit(
+            self.base_fc,
+            residual_df=self.residuals,
+            cross_sectional_Smat=self.s_mat_cross,
+        )
+
+        # Reconcile
+        self.reconciled_fc = ct_reco.reconcile(temporal_method, cross_sectional_method)
+
+        # Return
+        return self.reconciled_fc
+
+
 class CrossTemporalReconciler(object):
     """
     A class for Cross-Temporal Reconciliation.
@@ -74,7 +391,7 @@ class CrossTemporalReconciler(object):
             Fits the Cross-Temporal reconciler on the base forecasts
         reconcile:
             Reconciles the base forecasts
-    
+
     Returns
         reconciled_fc (pd.DataFrame):
             The reconciled forecasts for each temporal and cross-sectional level.
@@ -91,7 +408,7 @@ class CrossTemporalReconciler(object):
         >>> current = ['cat', 'catnum', 'itemnum', 'storenum']
         >>> correct = ['itemnum', 'catnum', 'cat', 'storenum']
         >>> splitter = "_"
-        >>> total = False 
+        >>> total = False
 
         >>> # ARguments for the schema of the temporal hierarchy
         >>> freq = 'M'
@@ -104,11 +421,11 @@ class CrossTemporalReconciler(object):
         >>> chief = CHieF(bottom_level_freq = freq, h=h, holdout = holdout, cv = cv)
 
         >>> # Fit CHieF -> builds the hierarchical format
-        >>> chief.fit(df = sample_df, 
-        >>>           current_format=current, 
-        >>>           corrected_format=correct, 
-        >>>           splitter=splitter, 
-        >>>           add_total = total, 
+        >>> chief.fit(df = sample_df,
+        >>>           current_format=current,
+        >>>           corrected_format=correct,
+        >>>           splitter=splitter,
+        >>>           add_total = total,
         >>>           format = 'pivoted')
 
         >>> # Extract values
@@ -129,9 +446,9 @@ class CrossTemporalReconciler(object):
         >>> res_extended = hierarchical_to_transaction(res, h_format, format = 'transaction')
 
         >>> # Define the reconciler
-        >>> cross_temporal_reconciler = CrossTemporalReconciler(bottom_level_freq = freq, 
-        >>>                                                     h = h, 
-        >>>                                                     holdout = holdout, 
+        >>> cross_temporal_reconciler = CrossTemporalReconciler(bottom_level_freq = freq,
+        >>>                                                     h = h,
+        >>>                                                     holdout = holdout,
         >>>                                                     cv = cv)
 
         >>> # fit
@@ -142,15 +459,15 @@ class CrossTemporalReconciler(object):
 
 
     References:
-        -Kourentzes, N., & Athanasopoulos, G. (2019). 
-        Cross-temporal coherent forecasts for Australian tourism. 
+        -Kourentzes, N., & Athanasopoulos, G. (2019).
+        Cross-temporal coherent forecasts for Australian tourism.
         Annals of Tourism Research, 75, 393–409. [DOI]
 
-        -Di Fonzo T., Girolimetto D. (2021). 
+        -Di Fonzo T., Girolimetto D. (2021).
         “Cross-temporal forecast reconciliation: Optimal combination method and heuristic alternatives.
         ” International Journal of Forecasting, (in press). doi: 10.1016/j.ijforecast.2021.08.004
 
-        
+
     """
 
     def __init__(self, bottom_level_freq, h, holdout=False, cv=None):
