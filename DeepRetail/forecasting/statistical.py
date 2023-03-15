@@ -6,7 +6,15 @@ from DeepRetail.transformations.formats import (
     statsforecast_forecast_format,
 )
 from statsforecast import StatsForecast
-from statsforecast.models import AutoETS, AutoARIMA, Naive, SeasonalNaive
+from statsforecast.models import (
+    AutoETS,
+    AutoARIMA,
+    Naive,
+    SeasonalNaive,
+    CrostonClassic,
+    CrostonOptimized,
+    CrostonSBA,
+)
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -143,6 +151,15 @@ class StatisticalForecaster(object):
         if "ETS" in models:
             models_to_fit.append(AutoETS(season_length=self.seasonal_length))
             model_names.append("ETS")
+        if "CrostonClassic" in models:
+            models_to_fit.append(CrostonClassic())
+            model_names.append("CrostonClassic")
+        if "CrostonOptimized" in models:
+            models_to_fit.append(CrostonOptimized())
+            model_names.append("CrostonOptimized")
+        if "SBA" in models:
+            models_to_fit.append(CrostonSBA())
+            model_names.append("SBA")
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
