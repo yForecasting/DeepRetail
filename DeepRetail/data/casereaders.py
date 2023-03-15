@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import gc
 import datetime
-# import re
+import re
 
 
 def read_case_0(read_filepath, calendar_filepath):
@@ -362,3 +362,19 @@ def read_case_4(read_filepath):
     df = df.groupby(["date", "unique_id"]).sum().reset_index()
 
     return df
+
+
+def remove_gifts(p, q):
+    """A function to compare values on case 5
+
+    Args:
+        p (float): Value 1 to compare
+        q (float): value 2 to compare
+
+    Returns:
+        int: A flag 1 or 2 on weather to keep or not a specific column
+    """
+    if (q > 0) & (p == 0):
+        return 1
+    else:
+        return 0
