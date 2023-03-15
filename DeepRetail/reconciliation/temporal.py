@@ -707,7 +707,9 @@ class THieF(object):
                 # Currently only supporting StatisticalForecaster
                 self.base_forecasters = {
                     factor: StatisticalForecaster(
-                        models=models[factor], freq=self.resampled_factors[i], n_jobs=n_jobs
+                        models=models[factor],
+                        freq=self.resampled_factors[i],
+                        n_jobs=n_jobs,
                     )
                     for i, factor in enumerate(self.factors)
                 }
@@ -728,7 +730,6 @@ class THieF(object):
 
                 # Concat in a single dataframe
                 self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
-
                 # Reset index and drop column from multi-index
                 # also rename the remaining index to get the temporal level
                 self.base_forecasts = (
@@ -736,7 +737,6 @@ class THieF(object):
                     .drop(columns="level_1")
                     .rename(columns={"level_0": "temporal_level"})
                 )
-
                 # Get residuals
                 # NOTE: change the get_residual to accept as argument the df
                 # This way I can have temp dataframes instead of self.resampled_dfs
@@ -755,11 +755,18 @@ class THieF(object):
             self.base_forecasts = pd.concat(temp_total_base_forecasts)
             self.base_forecast_residuals = pd.concat(temp_total_residuals)
 
+            # Drop the date before merging if exists
+            if "date" in self.base_forecasts.columns:
+                self.base_forecasts = self.base_forecasts.drop(columns="date")
+
+            # Add the fhs
+            temp_test_dfs = self.add_fh()
+
             # Merge with the true
             self.base_forecasts = pd.merge(
                 self.base_forecasts,
-                self.resampled_test_dfs,
-                on=["unique_id", "date", "temporal_level", "cv"],
+                temp_test_dfs,  # replaces the date column with the fh to fix an issue
+                on=["unique_id", "fh", "temporal_level", "cv"],
                 how="left",
             )
 
@@ -809,6 +816,43 @@ class THieF(object):
 
         if to_return:
             return self.base_forecasts
+
+    def add_fh(self):
+        """
+        Adds the forecast horizon to the base forecasts.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Create a copy
+        temp_1 = self.resampled_test_dfs.copy()
+
+        # Get the levels and the cvs
+        levels = temp_1["temporal_level"].unique()
+        cvs = temp_1["cv"].unique()
+
+        # Initialize a df
+        out_df = pd.DataFrame()
+
+        # Iterate over levels and cvs
+        for level in levels:
+            # filter
+            temp_2 = temp_1[temp_1["temporal_level"] == level]
+            for cv in cvs:
+                # Filter the cvs
+                temp = temp_2[temp_2["cv"] == cv]
+                # Add the fh
+                total_dates = temp["date"].unique()
+                fh_dict = dict(zip(total_dates, range(1, len(total_dates) + 1)))
+                temp["fh"] = temp["date"].map(fh_dict)
+
+                # Concat
+                out_df = pd.concat([out_df, temp])
+
+        return out_df
 
     def get_residuals(self):
         """
