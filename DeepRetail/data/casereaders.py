@@ -163,3 +163,62 @@ def read_case_1(read_filepath, write_filepath, frequency, temporary_save):
     # Final save
     # out_df = fix_duplicate_cols(out_df)
     return out_df
+
+
+def read_case_2(read_filepath):
+    """Reads data for case 2
+
+    Args:
+        read_filepath (str): Existing loocation of the data file
+    """
+
+    # Read data from an excel format
+    xl = pd.ExcelFile(read_filepath)
+    df = pd.read_excel(
+        xl, "data"
+    )  # data is the name of the tab with the time series data
+
+    # Rename columns
+    df = df.rename(
+        columns={
+            "Verkoopdoc": "OrderNum",
+            "klantnr.": "CostumerNum",
+            "artikelnr.": "ID",
+            "orderhoeveelheid VE": "y",
+            "Gecr. op": "date",
+            "GewLevrDat": "DeliveryDate",
+            "land": "Country",
+            "productfamilie": "ProductFamily",
+            "internalgroup": "Internal",
+            "segment": "Segment",
+        }
+    )
+
+    # Change some data types
+    items = df["ID"].values
+    # Splitting the string,
+    # Getting the 2nd value after the split and converting to a number
+    items_num = [int(single_item.split(" ")[1]) for single_item in items]
+    df["ID"] = items_num
+    # Replace delimiters
+    df["y"] = [
+        float(val.replace(",", "."))
+        if type(val) == str
+        else float(str(val).replace(",", "."))
+        for val in df["y"].values
+    ]
+    # Convert to datetime
+    df["date"] = [pd.Timestamp(date, freq="D") for date in df["date"].values]
+
+    # prepare the unique_id col
+    # Format: Product Family + ID
+    df["unique_id"] = [
+        "-".join([product, str(id)])
+        for product, id in zip(df["ProductFamily"], df["ID"])
+    ]
+
+    # keeping only specific columns
+    cols_to_keep = ["date", "y", "unique_id"]
+    df = df[cols_to_keep]
+
+    return df
