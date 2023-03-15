@@ -123,8 +123,10 @@ def read_case_1(read_filepath, write_filepath, frequency, temporary_save):
 
     # Initialize the names on the unique_id
     # Lower level is the product-level
-    out_df = out_df.drop(["DC", "Shop"], axis=1)
-    out_df = out_df.rename(columns={"Item": "unique_id"})
+    out_df['unique_id'] = ['-'.join([d,s,i]) for d,s,i in zip(out_df['DC'], out_df['Shop'], out_df['Item'])]
+    out_df = out_df.drop(["DC", "Shop", "Item"], axis=1)
+    #out_df = out_df.rename(columns={"Item": "unique_id"})
+    
     # Pivot and resample to the given frequency
     out_df = (
         pd.pivot_table(
@@ -143,8 +145,9 @@ def read_case_1(read_filepath, write_filepath, frequency, temporary_save):
         start_date = temp_date - datetime.timedelta(days=1)
 
         # Update names on the unique_id, drop columns, pivot & resample
-        temp_df = temp_df.drop(["DC", "Shop"], axis=1)
-        temp_df = temp_df.rename(columns={"Item": "unique_id"})
+        temp_df['unique_id'] = ['-'.join([d,s,i]) for d,s,i in zip(temp_df['DC'], temp_df['Shop'], temp_df['Item'])]
+        temp_df = temp_df.drop(["DC", "Shop", "Item"], axis=1)
+        # temp_df = temp_df.rename(columns={"Item": "unique_id"})
 
         temp_df = (
             pd.pivot_table(
