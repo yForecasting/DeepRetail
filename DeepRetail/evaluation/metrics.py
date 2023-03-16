@@ -182,7 +182,7 @@ def mae(actual, predicted, *args, **kwargs):
     Returns:
         np.array: The mean absolute error.
     """
-    return mean_absolute_error(y_true=actual, y_pred=predicted)
+    return mean_absolute_error(actual, predicted)
 
 
 def mape(actual, predicted, *args, **kwargs):
