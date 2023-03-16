@@ -26,8 +26,7 @@ setuptools.setup(
         'matplotlib',
         'numpy',
         'statsforecast',
-        'numba',
-        'openpyxl'
+        'numba'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
