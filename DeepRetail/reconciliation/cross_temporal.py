@@ -252,19 +252,19 @@ class C_THieF(object):
 
         # Check if we have a model for each level
         if self.factors is None:
-            total_factors = get_factors(get_numeric_frequency(self.bottom_level_freq))
+            self.factors = get_factors(get_numeric_frequency(self.bottom_level_freq))
         if isinstance(models, str):
             # If not, use the same model for all levels
-            models = {i: models for i in total_factors}
+            models = {i: models for i in self.factors}
         # Check if we have enough models
-        elif len(models) != len(total_factors):
+        elif len(models) != len(self.factors):
             raise ValueError(
                 "The number of models should be equal to the number of factors"
             )
 
         # Define and fit the initial THieF
         self.main_THieF = THieF(
-            bottom_level_freq=self.bottom_level_freq, holdout=self.holdout, cv=self.cv
+            bottom_level_freq=self.bottom_level_freq, factors=self.factors, holdout=self.holdout, cv=self.cv
         )
 
         # fit thief to the entire hierarchical df
