@@ -158,7 +158,7 @@ class TemporalReconciler(object):
         )
 
         # Add the model to the unique_id
-        temp_df["unique_id_model"] = temp_df["unique_id"] + "-" + temp_df["Model"]
+        temp_df["unique_id_model"] = temp_df["unique_id"] + "~" + temp_df["Model"]
 
         # Pivot
         temp_df = pd.pivot_table(
@@ -293,10 +293,10 @@ class TemporalReconciler(object):
 
         # Split the unique id and the model
         reco_df["unique_id"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("-")[0]
+            lambda x: x.split("~")[0]
         )
         reco_df["Base_Model"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("-")[1]
+            lambda x: x.split("~")[1]
         )
 
         # Add the Model
