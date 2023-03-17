@@ -127,7 +127,7 @@ class C_THieF(object):
 
     """
 
-    def __init__(self, bottom_level_freq, factors=None, holdout=True, cv=None):
+    def __init__(self, bottom_level_freq, h, factors=None, holdout=True, cv=None):
         """
         Initialize the C_THieF class.
         Extracts the important parameters for THieF and CHieF classes
@@ -142,6 +142,8 @@ class C_THieF(object):
             factors (list):
                 A list of factors to be used for the reconciliation.
                 Default is None and factors are estimated automaticaly.
+            h (int):
+                The number of periods ahead to forecast.
             holdout (bool):
                 Whether to use holdout or not.
                 Default is True.
@@ -156,7 +158,8 @@ class C_THieF(object):
 
         self.bottom_level_freq = bottom_level_freq
         # Currently only supports 1-period ahead forecasting.
-        self.h = get_numeric_frequency(self.bottom_level_freq)
+        # self.h = get_numeric_frequency(self.bottom_level_freq)
+        self.h = h
         self.holdout = holdout
         self.factors = factors
 
@@ -311,19 +314,19 @@ class C_THieF(object):
         """
 
         # Define the reconciler
-        ct_reco = CrossTemporalReconciler(
-            self.bottom_level_freq, self.h, holdout=self.holdout, cv=self.cv
+        self.ct_reco = CrossTemporalReconciler(
+            self.bottom_level_freq, factors=self.factors,  h=self.h, holdout=self.holdout, cv=self.cv
         )
 
         # Fit the reconciler
-        ct_reco.fit(
+        self.ct_reco.fit(
             self.base_fc,
             residual_df=self.residuals,
             cross_sectional_Smat=self.s_mat_cross,
         )
 
         # Reconcile
-        self.reconciled_fc = ct_reco.reconcile(temporal_method, cross_sectional_method)
+        self.reconciled_fc = self.ct_reco.reconcile(temporal_method, cross_sectional_method)
 
         # Return
         return self.reconciled_fc
@@ -470,7 +473,7 @@ class CrossTemporalReconciler(object):
 
     """
 
-    def __init__(self, bottom_level_freq, h, holdout=False, cv=None):
+    def __init__(self, bottom_level_freq, factors, h, holdout=False, cv=None):
         """
         Initializes the Cross-Temporal reconciler
 
@@ -493,6 +496,7 @@ class CrossTemporalReconciler(object):
         self.bottom_level_freq = bottom_level_freq
         self.h = h
         self.holdout = holdout
+        self.factors = factors
         if cv is None:
             self.cv = 1
         self.cv = cv
@@ -578,6 +582,10 @@ class CrossTemporalReconciler(object):
                     temporal_method=temporal_method,
                     residual_fold=residual_df_fold,
                 )
+
+                # Fixes an issue with user-given factors
+                # remove rows with nans
+                temporaly_reconciled = temporaly_reconciled.dropna()
 
                 # Then we get the list of cross-sectional matrices G for each temporal level
                 G_list = self.get_cross_sectional_G_matrices(
@@ -724,6 +732,7 @@ class CrossTemporalReconciler(object):
             )  # We dont want multiple cvs here we iterate outside the function
             self.dummy_temporal_reconciler = TemporalReconciler(
                 bottom_level_freq=self.bottom_level_freq,
+                factors=self.factors,
                 holdout=self.holdout,
                 cv=temp_cv,
             )
@@ -772,6 +781,9 @@ class CrossTemporalReconciler(object):
 
         # Extract the temporal levels
         temporal_levels = temporaly_reconciled["temporal_level"].unique()
+
+        # Ensures we have integers and drop if we have nan
+        temporal_levels = temporal_levels.astype(int)
 
         # Initialize a list to keep the G matrices
         G_list = []
