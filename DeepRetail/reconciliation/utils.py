@@ -39,12 +39,11 @@ def convert_offset_to_lower_freq(offset):
     Returns:
         str: The converted offset
     """
-
     # split the offset into the number and the frequency
     if len(offset) == 1:
         total_periods, freq = 1, offset
     else:
-        total_periods, freq = int(offset[:-1]), offset[-1]
+        total_periods, freq = int(float(offset[:-1])), offset[-1]
     # Loop for every case, H, D, W, M, Q
     # Start from the lowest frequency
     if freq == "H":
