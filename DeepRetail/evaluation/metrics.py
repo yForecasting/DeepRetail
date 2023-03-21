@@ -117,9 +117,10 @@ def percentage_error(actual, predicted, *args, **kwargs):
     """
 
     # % Error
-    return simple_error(actual, predicted) / (
-        actual + e
-    )  # The small e asserts that division is not with 0
+    error = simple_error(actual, predicted, **kwargs)/actual
+    # in case the actual is zero return zero
+    error[actual == 0] = 0
+    return error
 
 
 def naive_forecasts(actual, lag=1):
