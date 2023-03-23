@@ -10,6 +10,7 @@ from DeepRetail.reconciliation.utils import (
     compute_y_tilde,
     get_w_matrix_mse,
 )
+from DeepRetail.transformations.formats import pivoted_df
 import numpy as np
 import pandas as pd
 
@@ -157,7 +158,7 @@ class TemporalReconciler(object):
         )
 
         # Add the model to the unique_id
-        temp_df["unique_id_model"] = temp_df["unique_id"] + "-" + temp_df["Model"]
+        temp_df["unique_id_model"] = temp_df["unique_id"] + "~" + temp_df["Model"]
 
         # Pivot
         temp_df = pd.pivot_table(
@@ -250,7 +251,8 @@ class TemporalReconciler(object):
 
         # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
         reconciled_values = [
-            compute_y_tilde(y, self.Smat, mat) for y, mat in zip(values, self.Wmat)
+            compute_y_tilde(y, self.Smat, mat, return_G=False)
+            for y, mat in zip(values, self.Wmat)
         ]
 
         # Convert to dataframe
@@ -291,10 +293,10 @@ class TemporalReconciler(object):
 
         # Split the unique id and the model
         reco_df["unique_id"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("-")[0]
+            lambda x: x.split("~")[0]
         )
         reco_df["Base_Model"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("-")[1]
+            lambda x: x.split("~")[1]
         )
 
         # Add the Model
@@ -378,17 +380,13 @@ class TemporalReconciler(object):
                 temp_residual_df = residual_df[residual_df["cv"] == k + 1]
 
                 # Get the Weight matrix
-                self.Wmat = self.compute_matrix_W(
-                    method, residual_df=temp_residual_df
-                )
+                self.Wmat = self.compute_matrix_W(method, residual_df=temp_residual_df)
 
                 # Reconciles
                 self.reconciled_df = self.get_reconciled_predictions()
 
                 # reverses the format
-                self.reconciled_df = self.reverse_reconciliation_format(
-                    method
-                )
+                self.reconciled_df = self.reverse_reconciliation_format(method)
 
                 # Add the cv
                 self.reconciled_df["cv"] = k + 1
@@ -411,17 +409,13 @@ class TemporalReconciler(object):
 
         else:
             # Get the Weight matrix
-            self.Wmat = self.compute_matrix_W(
-                method, residual_df=residual_df
-            )
+            self.Wmat = self.compute_matrix_W(method, residual_df=residual_df)
 
             # Reconciles
             self.reconciled_df = self.get_reconciled_predictions()
 
             # reverses the format
-            self.reconciled_df = self.reverse_reconciliation_format(
-                method
-            )
+            self.reconciled_df = self.reverse_reconciliation_format(method)
 
         return self.reconciled_df
 
@@ -577,6 +571,11 @@ class THieF(object):
 
         """
 
+        # Ensure we have the right format
+        original_df = (
+            pivoted_df(original_df) if format == "transaction" else original_df
+        )
+
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
         self.original_df = original_df
@@ -658,7 +657,7 @@ class THieF(object):
                 self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
             }
 
-    def predict(self, models, to_return=True):
+    def predict(self, models, to_return=True, n_jobs=1):
         """
         Generates base forecasts for each temporal level
 
@@ -671,6 +670,9 @@ class THieF(object):
             to_return (bool, optional):
                 Whether to return the base forecasts or not.
                 Default is True
+            n_jobs (int, optional):
+                The number of cores to run in parallel.
+                Default is 1.
 
         Returns:
             pd.DataFrame:
@@ -705,7 +707,9 @@ class THieF(object):
                 # Currently only supporting StatisticalForecaster
                 self.base_forecasters = {
                     factor: StatisticalForecaster(
-                        models=models[factor], freq=self.resampled_factors[i]
+                        models=models[factor],
+                        freq=self.resampled_factors[i],
+                        n_jobs=n_jobs,
                     )
                     for i, factor in enumerate(self.factors)
                 }
@@ -726,7 +730,6 @@ class THieF(object):
 
                 # Concat in a single dataframe
                 self.base_forecasts = pd.concat(temp_base_forecasts, axis=0)
-
                 # Reset index and drop column from multi-index
                 # also rename the remaining index to get the temporal level
                 self.base_forecasts = (
@@ -734,7 +737,6 @@ class THieF(object):
                     .drop(columns="level_1")
                     .rename(columns={"level_0": "temporal_level"})
                 )
-
                 # Get residuals
                 # NOTE: change the get_residual to accept as argument the df
                 # This way I can have temp dataframes instead of self.resampled_dfs
@@ -753,11 +755,18 @@ class THieF(object):
             self.base_forecasts = pd.concat(temp_total_base_forecasts)
             self.base_forecast_residuals = pd.concat(temp_total_residuals)
 
+            # Drop the date before merging if exists
+            if "date" in self.base_forecasts.columns:
+                self.base_forecasts = self.base_forecasts.drop(columns="date")
+
+            # Add the fhs
+            temp_test_dfs = self.add_fh()
+
             # Merge with the true
             self.base_forecasts = pd.merge(
                 self.base_forecasts,
-                self.resampled_test_dfs,
-                on=["unique_id", "date", "temporal_level", "cv"],
+                temp_test_dfs,  # replaces the date column with the fh to fix an issue
+                on=["unique_id", "fh", "temporal_level", "cv"],
                 how="left",
             )
 
@@ -771,7 +780,7 @@ class THieF(object):
             # Currently only supporting StatisticalForecaster
             self.base_forecasters = {
                 factor: StatisticalForecaster(
-                    models=models[factor], freq=self.resampled_factors[i]
+                    models=models[factor], freq=self.resampled_factors[i], n_jobs=n_jobs
                 )
                 for i, factor in enumerate(self.factors)
             }
@@ -785,7 +794,8 @@ class THieF(object):
             # Generate base forecasts
             temp_base_forecasts = {
                 factor: self.base_forecasters[factor].predict(
-                    h=self.frequencies[i], holdout=False,
+                    h=self.frequencies[i],
+                    holdout=False,
                 )
                 for i, factor in enumerate(self.factors)
             }
@@ -806,6 +816,43 @@ class THieF(object):
 
         if to_return:
             return self.base_forecasts
+
+    def add_fh(self):
+        """
+        Adds the forecast horizon to the base forecasts.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Create a copy
+        temp_1 = self.resampled_test_dfs.copy()
+
+        # Get the levels and the cvs
+        levels = temp_1["temporal_level"].unique()
+        cvs = temp_1["cv"].unique()
+
+        # Initialize a df
+        out_df = pd.DataFrame()
+
+        # Iterate over levels and cvs
+        for level in levels:
+            # filter
+            temp_2 = temp_1[temp_1["temporal_level"] == level]
+            for cv in cvs:
+                # Filter the cvs
+                temp = temp_2[temp_2["cv"] == cv]
+                # Add the fh
+                total_dates = temp["date"].unique()
+                fh_dict = dict(zip(total_dates, range(1, len(total_dates) + 1)))
+                temp["fh"] = temp["date"].map(fh_dict)
+
+                # Concat
+                out_df = pd.concat([out_df, temp])
+
+        return out_df
 
     def get_residuals(self):
         """

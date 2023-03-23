@@ -39,12 +39,11 @@ def convert_offset_to_lower_freq(offset):
     Returns:
         str: The converted offset
     """
-
     # split the offset into the number and the frequency
     if len(offset) == 1:
         total_periods, freq = 1, offset
     else:
-        total_periods, freq = int(offset[:-1]), offset[-1]
+        total_periods, freq = int(float(offset[:-1])), offset[-1]
     # Loop for every case, H, D, W, M, Q
     # Start from the lowest frequency
     if freq == "H":
@@ -294,7 +293,7 @@ def get_w_matrix_structural(frequencies, total_ts):
     return W_inv
 
 
-def compute_y_tilde(y_hat, Smat, Wmat):
+def compute_y_tilde(y_hat, Smat, Wmat, Gmat=None, return_G=False):
     """
     Compute the reconciled y_tilde through matrix multiplications
     Have a fallback for the case where the matrix is not invertible.
@@ -303,49 +302,72 @@ def compute_y_tilde(y_hat, Smat, Wmat):
         y_hat (numpy.ndarray): a numpy array representing the predicted y
         Smat (numpy.ndarray): a numpy array representing the summation matrix S
         Wmat (numpy.ndarray): a numpy array representing the weight W matrix
+        Gmat (numpy.ndarray): a numpy array representing the G matrix
+        return_G (bool): a boolean to return the G matrix
 
     Returns:
-        numpy.ndarray: a numpy array representing the reconciled y_tilde
+        y_tild (numpy.ndarray): a numpy array representing the reconciled y_tilde
+        G (numpy.ndarray): a numpy array representing the G matrix
 
     """
     # Does matrix multiplication to compute y_tilde
 
     # The full format of the matrix is like that
-    # S * (S_T * W_inv * S)^-1 S_T * W_inv * pred
+    # y~ = S*G*y_hat
+    # with G = A_inv * S_T * W_inv
+    # and A = S_T * W_inv * S
+    # S * (S_T * W_inv * S)^-1 S_T * W_inv * y_hat
 
-    # First we inverse W
-    try:
-        W_inv = np.linalg.inv(Wmat)
-    except np.linalg.LinAlgError:
-        # A fallback in case the matrix is not invertible due to det = 0
-        # This is the pseudo inverse of W
-        # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
-        W_inv = np.linalg.pinv(Wmat)
+    # If Gmat is not provided, we compute it
+    if Gmat is None:
+        # First we inverse W
+        try:
+            W_inv = np.linalg.inv(Wmat)
+        except np.linalg.LinAlgError:
+            # A fallback in case the matrix is not invertible due to det = 0
+            # This is the pseudo inverse of W
+            # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
+            W_inv = np.linalg.pinv(Wmat)
 
-    # Then get the A = S_T * W_inv * S
-    A = Smat.T @ W_inv @ Smat
+        # Then get the A = S_T * W_inv * S
+        A = Smat.T @ W_inv @ Smat
 
-    # Inverse A
-    try:
-        A_inv = np.linalg.inv(A)
-    except np.linalg.LinAlgError:
-        # A fallback in case the matrix is not invertible due to det = 0
-        # This is the pseudo inverse of A
-        # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
-        A_inv = np.linalg.pinv(A)
+        # Inverse A
+        try:
+            A_inv = np.linalg.inv(A)
+        except np.linalg.LinAlgError:
+            # A fallback in case the matrix is not invertible due to det = 0
+            # This is the pseudo inverse of A
+            # https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse
+            A_inv = np.linalg.pinv(A)
 
-    # Now we have: S * A_inv * S_T * W_inv * pred
-    # First take the S* A_inv * S_T
-    B = Smat @ A_inv @ Smat.T
+        # Next, estimating G:
+        Gmat = A_inv @ Smat.T @ W_inv
 
-    # Now we have: B * W_inv * pred
-    # First take the B * W_inv
-    C = B @ W_inv
+        # Now we have y_tild = SGy_hat
 
-    # Now we have: C * pred
-    y_tilde = C @ y_hat
+        ###############################################
+        # OLDER VERSION
+        # Now we have: S * A_inv * S_T * W_inv * pred
+        # First take the S* A_inv * S_T
+        # B = Smat @ A_inv @ Smat.T
 
-    return y_tilde
+        # Now we have: B * W_inv * pred
+        # First take the B * W_inv
+        # C = B @ W_inv
+
+        # Now we have: C * pred
+        # y_tilde = C @ y_hat
+        ###############################################
+
+    # Now we have y_tild = SGy_hat
+    # Getting the y_tild
+    y_tild = Smat @ Gmat @ y_hat
+
+    if return_G:
+        return y_tild, Gmat
+    else:
+        return y_tild
 
 
 def get_w_matrix_mse(res_df, factors):

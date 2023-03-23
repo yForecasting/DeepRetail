@@ -22,11 +22,12 @@ setuptools.setup(
     python_requires=">=3.5",
     # Enable install requires when publishing on the normal PyPi
     install_requires=[
-        'pandas',
+        'pandas==1.5.3',
         'matplotlib',
         'numpy',
         'statsforecast',
-        'numba'
+        'numba',
+        'openpyxl'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

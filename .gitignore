@@ -133,3 +133,6 @@ debug_notebooks
 
 # The data folder
 DeepRetail/data/data_folder/
+
+DeepRetail/example_notebooks/load_company_data
+DeepRetail/example_notebooks/experiment

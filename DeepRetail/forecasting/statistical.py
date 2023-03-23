@@ -6,12 +6,23 @@ from DeepRetail.transformations.formats import (
     statsforecast_forecast_format,
 )
 from statsforecast import StatsForecast
-from statsforecast.models import AutoETS, AutoARIMA, Naive, SeasonalNaive
+from statsforecast.models import (
+    AutoETS,
+    AutoARIMA,
+    Naive,
+    SeasonalNaive,
+    CrostonClassic,
+    CrostonOptimized,
+    CrostonSBA,
+)
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from statsmodels.tsa.stattools import acf
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
+import dask.dataframe as dd
+from dask.distributed import Client
+from fugue_dask import DaskExecutionEngine
 
 
 class StatisticalForecaster(object):
@@ -92,7 +103,16 @@ class StatisticalForecaster(object):
 
     """
 
-    def __init__(self, models, freq, n_jobs=-1, warning=False, seasonal_length=None):
+    def __init__(
+        self,
+        models,
+        freq,
+        n_jobs=1,
+        warning=False,
+        seasonal_length=None,
+        distributed=False,
+        n_partitions=None,
+    ):
         """
         Initialize the StatisticalForecaster object.
 
@@ -101,7 +121,7 @@ class StatisticalForecaster(object):
                 A list of models to fit. Currently only ETS is implemented.
             freq: str
                 The frequency of the data, e.g. 'D' for daily or 'M' for monthly.
-            n_jobs: int, default=-1
+            n_jobs: int, default=1
                 The number of jobs to run in parallel for the fitting process.
             warning: bool, default=False
                 Whether to show warnings or not.
@@ -143,9 +163,25 @@ class StatisticalForecaster(object):
         if "ETS" in models:
             models_to_fit.append(AutoETS(season_length=self.seasonal_length))
             model_names.append("ETS")
+        if "CrostonClassic" in models:
+            models_to_fit.append(CrostonClassic())
+            model_names.append("CrostonClassic")
+        if "CrostonOptimized" in models:
+            models_to_fit.append(CrostonOptimized())
+            model_names.append("CrostonOptimized")
+        if "SBA" in models:
+            models_to_fit.append(CrostonSBA())
+            model_names.append("SBA")
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
+
+        self.distributed = distributed
+        self.n_partitions = n_partitions
+        # Initiate FugueBackend with DaskExecutionEngine if distributed is True
+        if self.distributed:
+            dask_client = Client()
+            engine = DaskExecutionEngine(dask_client=dask_client) # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
@@ -197,6 +233,11 @@ class StatisticalForecaster(object):
                 verbose=verbose,
             )
 
+        # Check if we have distributed training
+        if self.distributed:
+            # Convert the df to a dask dataframe
+            fc_df = dd.from_pandas(fc_df, npartitions=self.n_partitions)
+
         # Add to the object
         self.fc_df = fc_df
 
@@ -239,13 +280,23 @@ class StatisticalForecaster(object):
 
         if holdout:
             # Get the cross_validation
-            y_pred = self.forecaster.cross_validation(
-                df=self.fc_df,
-                h=self.h,
-                step_size=self.step_size,
-                n_windows=self.cv,
-                refit=self.refit,
-            )
+            # If we have distributed
+            if self.distributed:
+                y_pred = self.forecaster.cross_validation(
+                    df=self.fc_df,
+                    h=self.h,
+                    step_size=self.step_size,
+                    n_windows=self.cv,
+                    refit=self.refit,
+                ).compute()  # add the compute here
+            else:
+                y_pred = self.forecaster.cross_validation(
+                    df=self.fc_df,
+                    h=self.h,
+                    step_size=self.step_size,
+                    n_windows=self.cv,
+                    refit=self.refit,
+                )
 
             # edit the format
             # Reset index and rename
@@ -260,7 +311,13 @@ class StatisticalForecaster(object):
 
         else:
             # We just forecast
-            y_pred = self.forecaster.forecast(df=self.fc_df, h=self.h)
+            # If we have distributed
+            if self.distributed:
+                y_pred = self.forecaster.forecast(
+                    df=self.fc_df, h=self.h
+                ).compute()  # add the compute here
+            else:
+                y_pred = self.forecaster.forecast(df=self.fc_df, h=self.h)
 
             # edit the format
             # Reset index and rename

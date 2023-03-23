@@ -152,7 +152,7 @@ def mse(actual, predicted, *args, **kwargs):
     """
 
     # The mse
-    return mean_squared_error(y_true=actual, y_pred=predicted)
+    return mean_squared_error(actual, predicted)
 
 
 def rmse(actual, predicted, *args, **kwargs):
@@ -168,7 +168,7 @@ def rmse(actual, predicted, *args, **kwargs):
     """
 
     # for rmse just turn squared to false
-    return mean_squared_error(y_true=actual, y_pred=predicted, squared=False)
+    return mean_squared_error(actual, predicted, squared=False)
 
 
 def mae(actual, predicted, *args, **kwargs):
@@ -182,7 +182,7 @@ def mae(actual, predicted, *args, **kwargs):
     Returns:
         np.array: The mean absolute error.
     """
-    return mean_absolute_error(y_true=actual, y_pred=predicted)
+    return mean_absolute_error(actual, predicted)
 
 
 def mape(actual, predicted, *args, **kwargs):

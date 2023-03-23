@@ -138,10 +138,10 @@ class Evaluator(object):
 
         # Estimates mae and mse
         in_sample_metrics["in_sample_Naive_mse"] = in_sample_metrics.apply(
-            lambda row: mse(row.iloc[1:], row.iloc[:-1]), axis=1
+            lambda row: mse(row.iloc[1:].values, row.iloc[:-1].values), axis=1
         )
         in_sample_metrics["in_sample_Naive_mae"] = in_sample_metrics.apply(
-            lambda row: mae(row.iloc[1:], row.iloc[:-1]), axis=1
+            lambda row: mae(row.iloc[1:].values, row.iloc[:-1].values), axis=1
         )
 
         # Keeps only relevant columns

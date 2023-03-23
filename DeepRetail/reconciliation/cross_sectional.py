@@ -202,7 +202,7 @@ class CHieF(object):
             self.original_df, self.hierarchical_format, format=self.format
         )
 
-    def predict(self, models):
+    def predict(self, models, n_jobs=1):
         """
         Computes base forecasts for all hierarchical levels given the selected model
         In newer versions, user will select which model they want for every level
@@ -210,6 +210,9 @@ class CHieF(object):
         Args:
             models (list):
                 A list with the models to use for producing base forecasts
+            n_jobs (int, optional):
+                The number of cores to run in parallel.
+                Defaults to 1.
 
         Returns:
             base_forecasts (pd.DataFrame):
@@ -220,7 +223,7 @@ class CHieF(object):
 
         # Define the forecaster
         self.base_forecaster = StatisticalForecaster(
-            models=models, freq=self.bottom_level_freq
+            models=models, freq=self.bottom_level_freq, n_jobs=n_jobs
         )
 
         # Fit the forecaster
@@ -286,6 +289,9 @@ class CrossSectionalReconciler(object):
     Full covariance methods:
     - sam: Sample Covariance matrix (Wickramasuriya et al, 2019)
     - shrink: Shurnk Covariance matrix (Wickramasuriya et al, 2019)
+
+    Others:
+    custom: Uses a user-given reconciliation matrix G.
 
     Note: Full covariance methods are unstable. Prefer the others
 
@@ -429,7 +435,7 @@ class CrossSectionalReconciler(object):
                 self.original_df
             )
 
-    def reconcile(self, method, residual_df=None):
+    def reconcile(self, method, residual_df=None, Gmat=None):
         """
         Reconciles base forecasts using the given method
 
@@ -441,6 +447,9 @@ class CrossSectionalReconciler(object):
                 The dataframe with the residuals of the base forecasts.
                 Used for methods using the residuals.
                 Defaults to None.
+            Gmat (np.array, optional):
+                A custom G matrix for reconciliation.
+                Used when method = 'custom'.
 
         Returns:
             pd.DataFrame: The reconciled forecasts
@@ -451,7 +460,15 @@ class CrossSectionalReconciler(object):
         self.residual_df = residual_df
 
         # get the w matrix
-        self.W_mat = self.compute_w_matrix()
+        if self.reconciliation_method != "custom":
+            self.W_mat = self.compute_w_matrix()
+        elif self.reconciliation_method == "custom":
+            # ensure Gmat is given
+            if Gmat is None:
+                raise ValueError(
+                    "When using the custom method, you need to provide a custom G matrix"
+                )
+            self.W_mat = None
 
         # Extract the values from the smat
         S_mat_vals = self.S_mat.values
@@ -460,6 +477,7 @@ class CrossSectionalReconciler(object):
         if self.holdout:
             # Initialize a list to include the reconciled dataframes for every fold
             self.reconciled_cv_dfs = []
+            self.G_mats = []
 
             # Itterate over the folds
             for fold in range(self.cv):
@@ -467,7 +485,9 @@ class CrossSectionalReconciler(object):
                 y_hat_vals = self.reconciliation_ready_cv_dfs[fold].values
 
                 # Compute the reconciled forecasts
-                self.y_tild_vals = compute_y_tilde(y_hat_vals, S_mat_vals, self.W_mat)
+                self.y_tild_vals, G_mat = compute_y_tilde(
+                    y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True
+                )
 
                 # take the fold on the original df
                 temp_original_df = self.original_df[self.original_df["cv"] == fold + 1]
@@ -484,6 +504,7 @@ class CrossSectionalReconciler(object):
 
                 # Append
                 self.reconciled_cv_dfs.append(self.reconciled_df)
+                self.G_mats.append(G_mat)
 
             # Concatenate
             self.reconciled_df = pd.concat(self.reconciled_cv_dfs, axis=0)
@@ -493,7 +514,9 @@ class CrossSectionalReconciler(object):
             y_hat_vals = self.reconciliation_ready_df.values
 
             # Compute the reconciled forecasts
-            self.y_tild_vals = compute_y_tilde(y_hat_vals, S_mat_vals, self.W_mat)
+            self.y_tild_vals, self.G_mats = compute_y_tilde(
+                y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True
+            )
 
             # Give the right format
             self.reconciled_df = self.reverse_reconciliation_format(
