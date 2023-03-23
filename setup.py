@@ -13,7 +13,7 @@ setuptools.setup(
     name='DeepRetail',
     license="GNU GPLv3",
     description='Forecasting package for retail using Deep Learning AI.',
-    version='v0.0.4',
+    version='v0.0.5',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/yForecasting/DeepRetail',
@@ -22,7 +22,7 @@ setuptools.setup(
     python_requires=">=3.5",
     # Enable install requires when publishing on the normal PyPi
     install_requires=[
-        'pandas==1.5.3',
+        'pandas',
         'matplotlib',
         'numpy',
         'statsforecast',
