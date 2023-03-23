@@ -83,4 +83,4 @@ Start by reviewing the [contribution guidelines](https://github.com/yForecasting
 
 ## Support
 
-The [AI team](https://yforecasting.github.io/) at VIVES University of Applied Sciences builds and maintains `DeepRetail` to make it simple and accessible. We are using this software in our research on [demand forecasting](https://yvesrsagaert.wordpress.com/). A special thanks to Ruben Vanhecke and Filotas Theodosiou for their contribution.
+The [AI team](https://yforecasting.github.io/) at VIVES University of Applied Sciences builds and maintains `DeepRetail` to make it simple and accessible. We are using this software in our research on [demand forecasting](https://yvesrsagaert.wordpress.com/). A special thanks to Ruben Vanhecke and Filotas Theodosiou for their contribution. The [maintenance workflow](https://github.com/yForecasting/DeepRetail/blob/main/MAINTAINING.md) can be found here.
