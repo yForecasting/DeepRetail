@@ -1,4 +1,5 @@
 import pandas as pd
+from statsmodels.tsa.seasonal import MSTL
 
 
 def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
@@ -379,3 +380,26 @@ def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
 
     # Return
     return df
+
+
+def get_reminder(df, periods):
+    """
+    Decompose a time series and return the residuals.
+
+    Args:
+        df (pd.DataFrame):
+            A DataFrame containing the time series data
+        periods (list):
+            A list of periods to use for the decomposition (e.g. [7, 30, 365])
+
+    Returns:
+        residuals (pd.DataFrame):
+            A DataFrame containing the residuals of the decomposition
+    """
+    # Extract the values of the DataFrame
+    vals = df.values
+
+    # Use the MSTL function to decompose the time series and extract the residuals
+    res_only = [MSTL(ts, periods=periods).fit().resid for ts in vals]
+
+    return res_only
