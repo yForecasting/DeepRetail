@@ -403,3 +403,33 @@ def get_reminder(df, periods):
     res_only = [MSTL(ts, periods=periods).fit().resid for ts in vals]
 
     return res_only
+
+
+def MinMaxScaler_custom(x, feature_range):
+    """
+    Performs MinMaxScaling on a numpy array.
+    Follows the documentation from sklearn.
+
+    Args:
+        x (np.array):
+            The array to be scaled.
+        feature_range (tuple):
+            The range of the output.
+
+    Returns:
+        np.array:
+            The scaled array.
+
+    References:
+         https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html
+    """
+
+    # Extract some values
+    x_min, x_max = x.min(), x.max()
+    feature_min, feature_max = feature_range
+
+    # Perform scalling
+    X_std = (x - x_min) / (x_max - x_min)
+    X_scaled = X_std * (feature_max - feature_min) + feature_min
+
+    return X_scaled
