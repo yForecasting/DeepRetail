@@ -405,7 +405,7 @@ def get_reminder(df, periods):
     return res_only
 
 
-def MinMaxScaler_custom(x, feature_range):
+def MinMaxScaler_custom(x, feature_range=(0, 1)):
     """
     Performs MinMaxScaling on a numpy array.
     Follows the documentation from sklearn.
