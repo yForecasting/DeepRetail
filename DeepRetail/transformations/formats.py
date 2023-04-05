@@ -1,5 +1,5 @@
 import pandas as pd
-from statsmodels.tsa.seasonal import MSTL
+from DeepRetail.transformations.decomposition import MSTL
 
 
 def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
