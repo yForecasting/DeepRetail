@@ -27,7 +27,9 @@ setuptools.setup(
         'numpy',
         'statsforecast',
         'numba',
-        'openpyxl'
+        'openpyxl',
+        'tsfeatures',
+        'statsmodels'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
