@@ -1,4 +1,6 @@
 from pandas.tseries.frequencies import to_offset
+import numpy as np
+import pandas as pd
 
 
 def get_numeric_frequency(freq):
@@ -57,3 +59,190 @@ def get_numeric_frequency(freq):
     )
 
     return numeric_freq
+
+
+# A functions that extends input features to the extended format.
+def add_missing_values(input_features, input_transformations=None):
+    """
+    Fills the features and transformations dictionaries with default values.
+    Default values are Nones and nans.
+
+    Args:
+        input_features (dict):
+            A dictionary containing the features to be used in the model.
+        input_transformations (dict):
+            A dictionary containing the transformations to be used in the model.
+
+    Returns:
+        input_features: (dict):
+            A dictionary containing the features to be used in the model.
+        input_transformations: (dict):
+            A dictionary containing the transformations to be used in the model.
+    """
+
+    # Default values for features and transformations dictionaries
+    # Initialize a dictionary for transformations if it is none
+    input_transformations = (
+        {} if input_transformations is None else input_transformations
+    )
+
+    features = {
+        "lags": None,
+        "rolling_features": None,
+        "rolling_lags": None,
+        "seasonal_features": None,
+        "fourier_terms": None,
+        "positional_features": False,
+        "time_series_id": False,
+        "level_information": None,
+    }
+    transformations = {
+        "stationarity": False,
+        "logarithm": False,
+        "normalize": None,
+        "custom_no_reverse_1": None,
+        "custom_no_reverse_2": None,
+        "custom_no_reverse_3": None,
+        "custom_reverse_1": [None, None],
+        "custom_reverse_2": [None, None],
+        "custom_reverse_3": [None, None],
+    }
+
+    # Check if each key in default features exists in input_features,
+    # if not, add it with value equal to None
+    for key in features.keys():
+        if key not in input_features.keys():
+            input_features[key] = features[key]
+
+    # Check if each key in default transformations exists in input_transformations,
+    # if not, add it with value equal to None
+    for key in transformations.keys():
+        if key not in input_transformations.keys():
+            input_transformations[key] = transformations[key]
+
+    return input_features, input_transformations
+
+
+def augment(ts, window_size):
+    """
+    Augments the time series data by creating windows of size `window_size` days.
+    If the length of the series is less than the window size, it pads the series with zeros.
+
+    Args:
+        ts (np.array):
+            time series data
+        window_size (int):
+            size of the windows in days
+
+    Returns:
+        view (np.array):
+            augmented time series data
+    """
+    total_length = len(ts)
+
+    # If the length of the series is less than the window size, add padding with NaN values
+    if total_length < window_size:
+        zeros_to_add = window_size - total_length
+        # Pad the series with NaN values
+        view = np.pad(ts, pad_width=(zeros_to_add, 0), constant_values=np.nan)
+        # Reshape the series to a 2D array
+        view = view.reshape(1, -1)
+    else:
+        # Use the windowed function
+        view = window(ts, window_size)
+
+    return view
+
+
+def window(a, window_size):
+    """
+    Create windows of size `window_size` from the 1D array `a`.
+
+    Args:
+        a (np.array):
+            1D array
+        window_size (int):
+            size of the windows
+
+    Returns:
+        view (np.array):
+            2D array of windows
+    """
+    # Convert window size to int
+    w = int(window_size)
+    # Calculate the shape of the windowed array
+    sh = (a.size - w + 1, w)
+    # Calculate the strides for the windowed array
+    st = a.strides * 2
+    # Create the windowed array using as_strided method
+    view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[
+        0::1
+    ]  # The step size is 1, i.e. no overlapping
+    return view
+
+
+def create_lags(df, lags):
+    """
+    Creates the lagged dataframe for all time series on the input dataframe.
+
+    Args:
+        df (pd.DataFrame):
+            A dataframe containing the time series data.
+        lags (list):
+            A list containing the lags to be used.
+
+    Returns:
+        lags_df (pd.DataFrame):
+            A dataframe containing the lagged time series data.
+
+
+    """
+
+    lags_df = df.apply(lambda x: augment(x.values, lags).squeeze(), axis=1).to_frame(
+        name="lag_windows"
+    )
+
+    return lags_df
+
+
+def construct_single_rolling_feature(
+    df, rolling_aggregation, original_lags, rolling_windows, rolling_lags=1
+):
+    # Check if rolling_window is integer and convert to list
+    rolling_windows = (
+        [rolling_windows] if isinstance(rolling_windows, int) else rolling_windows
+    )
+
+    # In case rolling_lags has a single value, repeat it for the number of rolling windows
+    rolling_lags = (
+        np.repeat(rolling_lags, len(rolling_windows))
+        if isinstance(rolling_lags, int)
+        else rolling_lags
+    )
+
+    # Initialize a dataframe to include all rolling features
+    rolling_df = pd.DataFrame()
+
+    # for every rolling window itterate
+    for window, temp_lag in zip(rolling_windows, rolling_lags):
+        # Create the name of the rolling feature
+        name = f"rolling_{rolling_aggregation}_{window}"
+        # construct the rolling features for the time series
+        temp_df = df.rolling(window, axis=1).agg(rolling_aggregation)
+        # Slice them into lags -> using the starting number of lags as the original lags
+        # Also drop the lag_windows column
+        temp_df = create_lags(temp_df, original_lags)
+        # Keep only the specified amount and round the subwindow
+        # temp_df['lag_windows'] = [subwindows[:, -temp_lag:] for subwindows in temp_df['lag_windows'].values]
+        temp_df["lag_windows"] = [
+            subwindows[:, -temp_lag:].round(3)
+            for subwindows in temp_df["lag_windows"].values
+        ]
+        # rename
+        temp_df = temp_df.rename(columns={"lag_windows": name})
+
+        # Append to the main df
+        rolling_df = pd.concat([rolling_df, temp_df], axis=1)
+
+    # return]
+    return rolling_df
