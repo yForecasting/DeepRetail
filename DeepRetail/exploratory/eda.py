@@ -4,7 +4,7 @@ from DeepRetail.transformations.formats import (
     MinMaxScaler_custom,
     transaction_df,
 )
-from tsfeatures import tsfeatures, stl_features, entropy
+from tsfeatures import tsfeatures, stl_features, entropy, lumpiness
 
 
 def Residual_CoV(df, periods):
@@ -63,7 +63,7 @@ def get_features(df, seasonal_period, periods):
 
     # Estimate the features
 
-    features = tsfeatures(t_df, freq=seasonal_period, features=[stl_features, entropy])
+    features = tsfeatures(t_df, freq=seasonal_period, features=[stl_features, entropy, lumpiness])
     # Estimate CV here
     features["Residual_CoV"] = Residual_CoV(df, periods).squeeze()
 
