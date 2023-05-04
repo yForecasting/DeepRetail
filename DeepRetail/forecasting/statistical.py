@@ -428,12 +428,12 @@ class StatisticalForecaster(object):
 
         # Initialize simmulation parameters
         end_date = self.h + self.cv - 1
-        fitting_periods = sorted(self.fc_df["ds"].unique())[:-end_date]
+        fitting_periods = sorted(self.fc_df["date"].unique())[:-end_date]
         total_windows = len(fitting_periods) - self.h + 1
 
         # Pivot the dataframe
         temp_df = pd.pivot_table(
-            self.fc_df, index="unique_id", columns="ds", values="y", aggfunc="first"
+            self.fc_df, index="unique_id", columns="date", values="y", aggfunc="first"
         )
 
         # Initialize a df
