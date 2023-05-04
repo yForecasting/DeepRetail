@@ -523,7 +523,7 @@ def read_case_5(read_filepath):
     products = products.drop("AANTAL_SIG", axis=1)
 
     # take items per products
-    print(products.columns)
+    # print(products.columns)
     item_per_prod = products[["PRODUCT_CODE", "Cigars_Num", "FAM"]]
 
     # Adding the number of cigars per product!
@@ -533,12 +533,16 @@ def read_case_5(read_filepath):
     # Drop used columns
     df = df.drop(["Cigars_Num", "QTY_INVOICED"], axis=1)
 
+    # filter some nan values
+    df = df[~df['FAM'].isna()]
+    df = df.dropna()
+
     # groupby on product level
     df["product_id"] = [id.split("-")[0] for id in df["PRODUCT_CODE"]]
 
     # Add the family:
     df["product_id"] = [
-        str(fam) + str(id) for fam, id in zip(df["FAM"], df["product_id"])
+        str(fam) + '_' + str(id) for fam, id in zip(df["FAM"], df["product_id"])
     ]
 
     df = df.groupby(["product_id", "ORDER_DATE"]).agg({"Sales": "sum"}).reset_index()
