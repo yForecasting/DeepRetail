@@ -584,7 +584,7 @@ class THieF(object):
         if self.holdout:
             # Initialize variables
 
-            end_point = self.bottom_level_numeric_freq + self.cv - 1
+            end_point = self.max_freq + self.cv - 1
 
             # Initialize lists for train and test
             self.resampled_train_dfs = []

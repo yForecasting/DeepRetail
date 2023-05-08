@@ -117,9 +117,9 @@ def percentage_error(actual, predicted, *args, **kwargs):
     """
 
     # % Error
-    return simple_error(actual, predicted) / (
-        actual + e
-    )  # The small e asserts that division is not with 0
+    # in case the actual is zero return zero
+    error = simple_error(actual, predicted, **kwargs)/actual if actual != 0 else 0
+    return error
 
 
 def naive_forecasts(actual, lag=1):
@@ -304,5 +304,6 @@ def rmsse(actual, predicted, naive_mse=None, train=None, lag=1, *args, **kwargs)
         denom = mse(train[lag:], y_naive)
     else:
         raise ValueError("Provide in-sample mse or the training data ")
-    error = np.sqrt(num / np.maximum(denom, e))
+    # error = np.sqrt(num / np.maximum(denom, e))
+    error = np.sqrt(num/denom) if denom != 0 else 0
     return error

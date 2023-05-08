@@ -333,6 +333,9 @@ class StatisticalForecaster(object):
         # add the fh and cv
         self.add_fh_cv()
 
+        # Remove the index from the models if there
+        self.forecast_df = self.forecast_df[self.forecast_df['Model'] != 'index']
+
         # return
         return self.forecast_df
 

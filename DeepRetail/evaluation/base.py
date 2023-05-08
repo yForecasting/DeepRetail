@@ -1,6 +1,6 @@
 from DeepRetail.transformations.formats import transaction_df, pivoted_df
 from DeepRetail.evaluation.metrics import mse, mae, rmsse, scaled_error
-from DeepRetail.visuals.evaluation import (
+from DeepRetail.exploratory.visuals import (
     visualize_forecasts,
     plot_single_hist_boxplot,
     plot_box,
@@ -40,6 +40,44 @@ def calculate_group_scores(group, metrics):
         )
 
     return pd.Series(scores_dict)
+
+
+def calculate_scores_updated(df, metrics):
+    """
+    Calculates the scores for the full dataframe.
+    An updated version
+
+    Args:
+        df (pd.DataFrame): The dataframe of predictions
+        metrics (list): A list of metrics to be calculated
+
+    Returns:
+        pd.DataFrame: A dataframe with the scores
+
+    """
+    # Get the names of the metrics
+    metric_names = [metric.__name__ for metric in metrics]
+    # Get the in-sample scores
+    in_sample_mse = df["in_sample_Naive_mse"].unique()[0]
+    in_sample_mae = df["in_sample_Naive_mae"].unique()[0]
+
+    # Drop the two columns
+    df = df.drop(["in_sample_Naive_mse", "in_sample_Naive_mae"], axis=1)
+
+    # Estimate the error
+    # For every metric:
+    for metric, name in zip(metrics, metric_names):
+        df[name] = df.apply(
+            lambda x: metric(
+                x["True"],
+                x["y"],
+                naive_mse=in_sample_mse,
+                naive_mae=in_sample_mae,
+            ),
+            axis=1,
+        )
+    # return
+    return df
 
 
 class Evaluator(object):
@@ -150,7 +188,7 @@ class Evaluator(object):
         ]
         return in_sample_metrics.reset_index()
 
-    def evaluate(self, metrics, group_scores_by=["unique_id", "Model", "fh", "cv"]):
+    def evaluate(self, metrics, group_scores_by=None, opperator="mean"):
         """
         Evaluates the predictions and calculates the specified metrics for each group.
 
@@ -174,18 +212,36 @@ class Evaluator(object):
         )
 
         # estimate the scores
-        evaluation_df = pd.DataFrame(
-            merged_result_df.groupby(group_scores_by).apply(
-                calculate_group_scores, metrics=metrics
+        evaluation_df = calculate_scores_updated(merged_result_df, metrics)
+
+        # Make some changes
+        metric_names = [metric.__name__ for metric in metrics]
+        cols_to_keep = ["unique_id", "Model", "fh", "cv"] + metric_names
+        
+        evaluation_df = evaluation_df[evaluation_df['Model'] != 'index']
+        evaluation_df = evaluation_df[cols_to_keep]
+
+        # do the grouping
+        if group_scores_by is not None:
+            evaluation_df = (
+                evaluation_df.groupby(group_scores_by).agg(opperator).reset_index()
             )
-        ).reset_index()
+
+
+        return evaluation_df
+
+        # evaluation_df = pd.DataFrame(
+        #    merged_result_df.groupby(group_scores_by).apply(
+        #        calculate_group_scores, metrics=metrics
+        #    )
+        # ).reset_index()
 
         # add the metrics to the object
         # self.evaluated_metrics = metrics
         # self.evaluate_df = evaluation_df
         # return self.evaluation_df
 
-        return evaluation_df
+        #return evaluation_df
 
     def plot_error_distribution(
         self,
