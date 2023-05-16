@@ -136,3 +136,4 @@ DeepRetail/data/data_folder/
 
 DeepRetail/example_notebooks/load_company_data
 DeepRetail/example_notebooks/experiment
+DeepRetail/example_notebooks/experiment/complete_experiment
