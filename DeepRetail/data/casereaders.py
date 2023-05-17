@@ -55,11 +55,14 @@ def read_case_0(read_filepath, calendar_filepath):
     return df
 
 
-def read_case_1(read_filepath, write_filepath, frequency, temporary_save):
+def read_case_1(
+    read_filepath, products_filepath, write_filepath, frequency, temporary_save
+):
     """Reads data for case 1
 
     Args:
         read_filepath (str): Existing loocation of the data file
+        products_filepath (str): Existing location of the products file
         write_filepath (str): Location to save the new file
         frequency (str): The selected frequency.
                     Note: Due to size issues, for case 1 only supports W and M
@@ -169,8 +172,51 @@ def read_case_1(read_filepath, write_filepath, frequency, temporary_save):
         # Save at each itteration to deal with memory breaks
         if temporary_save:
             out_df.to_csv(write_filepath)
-    # Final save
-    # out_df = fix_duplicate_cols(out_df)
+
+    # Split the index in - and keep only the last part
+    out_df.index = out_df.index.str.split("-").str[-1]
+
+    # fill nans with 0
+    out_df = out_df.fillna(0)
+
+    # Sum all columns for rows with the same index
+    out_df = out_df.groupby(out_df.index).sum()
+
+    # Convert the type of index to int
+    out_df.index = out_df.index.astype(int)
+
+    # Add the product family hierarchical structure
+    # Read the products file
+    metadata = pd.ExcelFile(products_filepath)
+
+    # Prepare the product family
+    out_df = out_df.reset_index()
+    df_products = prepare_product_data(metadata, out_df)
+
+    # Add a unique numeric code for each product family
+    df_products["product_family_code"] = (
+        df_products["ProductFamily"].astype("category").cat.codes
+    )
+
+    # Add the hierarchical information here
+    # add the product_family_code to the df
+    out_df = pd.merge(
+        out_df, df_products[["product_family_code", "unique_id"]], on="unique_id"
+    )
+
+    # Add the new unique_id
+    out_df["unique_id"] = (
+        out_df["product_family_code"].astype(str)
+        + "_"
+        + out_df["unique_id"].astype(str)
+    )
+
+    # drop the product_family_code and the Item columns
+    out_df = out_df.drop(["product_family_code"], axis=1)
+
+    # Set the unique_id as index
+    out_df = out_df.set_index("unique_id")
+
     return out_df
 
 
@@ -243,7 +289,7 @@ def read_case_3(
     """
 
     # Loading
-    df = pd.read_csv(read_filepath)
+    df = pd.read_csv(read_filepath, sep=",", engine="python", error_bad_lines=False)
 
     # Removing instances with bad status
     ids = df[(df["Status"] == 4) | (df["Status"].isna()) | (df["Exclincl"] != 1)].index
@@ -387,6 +433,36 @@ def remove_gifts(p, q):
         return 1
     else:
         return 0
+
+
+def prepare_product_data(metadata, df):
+    """
+    Returns the product family csv from the metadata xlsx.
+
+    Args:
+        metadata (pd.ExcelFile): The excel file with the metadata.
+        df (pd.DataFrame): The dataframe with the time series information.
+
+    Returns:
+        pd.DataFrame: The product family dataframe.
+    """
+
+    # Split the metadata
+    s2 = pd.read_excel(metadata, "Export")
+
+    # Filter and rename columns
+    product_family = s2[["ACG - ACG", "ALDI nr"]]
+    product_family = product_family.rename(
+        columns={"ALDI nr": "unique_id", "ACG - ACG": "ProductFamily"}
+    ).drop_duplicates()
+
+    # Keep only relevant items
+    product_family["unique_id"] = product_family["unique_id"].astype(int)
+    product_family = product_family[
+        product_family["unique_id"].isin(df["unique_id"].unique())
+    ]
+
+    return product_family
 
 
 def read_case_5(read_filepath):
@@ -534,7 +610,7 @@ def read_case_5(read_filepath):
     df = df.drop(["Cigars_Num", "QTY_INVOICED"], axis=1)
 
     # filter some nan values
-    df = df[~df['FAM'].isna()]
+    df = df[~df["FAM"].isna()]
     df = df.dropna()
 
     # groupby on product level
@@ -542,7 +618,7 @@ def read_case_5(read_filepath):
 
     # Add the family:
     df["product_id"] = [
-        str(fam) + '_' + str(id) for fam, id in zip(df["FAM"], df["product_id"])
+        str(fam) + "_" + str(id) for fam, id in zip(df["FAM"], df["product_id"])
     ]
 
     df = df.groupby(["product_id", "ORDER_DATE"]).agg({"Sales": "sum"}).reset_index()

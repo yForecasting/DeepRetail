@@ -19,14 +19,16 @@ class Reader(object):
 
     """
 
-    def __init__(self, filepath, calendar_filepath=None, case=0, temporary_save=False):
+    def __init__(self, filepath, product_filepath=None, calendar_filepath=None, case=0, temporary_save=False):
         """
         Initializes a Reader object.
 
         Args:
             filepath (str): Path to the file to be read.
+            product_filepath (str, optional): Path to the product dataframe.
+                Required for case 1. Default to None.
             calendar_filepath (str, optional): Path to the calendar dataframe.
-                Required for case 3. Defaults to None.
+                Required for case 0. Defaults to None.
             case (int): Specifies the format of the data to be read.
                 Defaults to 0.
 
@@ -37,6 +39,7 @@ class Reader(object):
         assert type(case) == int, "case should be an integer"
         self.case = case
         self.filepath = filepath
+        self.product_filepath = product_filepath
         self.calendar_filepath = calendar_filepath
         self.temporary_save = temporary_save
 
@@ -79,7 +82,7 @@ class Reader(object):
         if self.case == 1:
             # For case 1 -> we first read the data in the folder
             temp_df = read_case_1(
-                self.filepath, self.save_filepath, self.frequency, self.temporary_save
+                self.filepath, self.product_filepath, self.save_filepath, self.frequency, self.temporary_save
             )
             # converts columns to str to fix a bug
             temp_df.columns = pd.to_datetime(temp_df.columns).astype(str)
