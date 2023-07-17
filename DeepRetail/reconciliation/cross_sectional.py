@@ -8,7 +8,7 @@ from DeepRetail.reconciliation.utils import (
     shrink_estim,
     cross_product,
 )
-from DeepRetail.forecasting.statistical import StatisticalForecaster
+from DeepRetail.forecasting.statistical import StatisticalForecaster, SeasonalDecomposeForecaster
 
 import pandas as pd
 import numpy as np
@@ -202,7 +202,7 @@ class CHieF(object):
             self.original_df, self.hierarchical_format, format=self.format
         )
 
-    def predict(self, models, n_jobs=1):
+    def predict(self, models, n_jobs=1, decompose=False):
         """
         Computes base forecasts for all hierarchical levels given the selected model
         In newer versions, user will select which model they want for every level
@@ -213,6 +213,8 @@ class CHieF(object):
             n_jobs (int, optional):
                 The number of cores to run in parallel.
                 Defaults to 1.
+            decompose (bool, optional):
+                Whether to decompose the time series before fitting the models.
 
         Returns:
             base_forecasts (pd.DataFrame):
@@ -222,17 +224,19 @@ class CHieF(object):
         self.base_models = models
 
         # Define the forecaster
-        self.base_forecaster = StatisticalForecaster(
-            models=models, freq=self.bottom_level_freq, n_jobs=n_jobs
-        )
+        if decompose:
+            self.base_forecaster = SeasonalDecomposeForecaster(
+                models=models, freq=self.bottom_level_freq, n_jobs=n_jobs
+            )
+
+        else:
+            self.base_forecaster = StatisticalForecaster(models=models, freq=self.bottom_level_freq, n_jobs=n_jobs)
 
         # Fit the forecaster
         self.base_forecaster.fit(self.cross_sectional_df, format="pivoted")
 
         # Make base predictions
-        self.base_forecasts = self.base_forecaster.predict(
-            h=self.h, cv=self.cv, holdout=self.holdout
-        )
+        self.base_forecasts = self.base_forecaster.predict(h=self.h, cv=self.cv, holdout=self.holdout)
 
         return self.base_forecasts
 
@@ -251,9 +255,7 @@ class CHieF(object):
         """
 
         # Define the reconciler
-        self.reconciler = CrossSectionalReconciler(
-            self.bottom_level_freq, self.h, cv=self.cv, holdout=self.holdout
-        )
+        self.reconciler = CrossSectionalReconciler(self.bottom_level_freq, self.h, cv=self.cv, holdout=self.holdout)
 
         # Fit the reconciler
         self.reconciler.fit(self.base_forecasts, self.S_mat)
@@ -266,9 +268,7 @@ class CHieF(object):
             self.residuals = None
 
         # Reconcile
-        self.reconciled_forecasts = self.reconciler.reconcile(
-            method, residual_df=self.residuals
-        )
+        self.reconciled_forecasts = self.reconciler.reconcile(method, residual_df=self.residuals)
 
         return self.reconciled_forecasts
 
@@ -431,9 +431,7 @@ class CrossSectionalReconciler(object):
                 self.reconciliation_ready_cv_dfs.append(temp_df)
         else:
             # Prepare
-            self.reconciliation_ready_df = self.get_reconciliation_format(
-                self.original_df
-            )
+            self.reconciliation_ready_df = self.get_reconciliation_format(self.original_df)
 
     def reconcile(self, method, residual_df=None, Gmat=None):
         """
@@ -465,9 +463,7 @@ class CrossSectionalReconciler(object):
         elif self.reconciliation_method == "custom":
             # ensure Gmat is given
             if Gmat is None:
-                raise ValueError(
-                    "When using the custom method, you need to provide a custom G matrix"
-                )
+                raise ValueError("When using the custom method, you need to provide a custom G matrix")
             self.W_mat = None
 
         # Extract the values from the smat
@@ -485,9 +481,7 @@ class CrossSectionalReconciler(object):
                 y_hat_vals = self.reconciliation_ready_cv_dfs[fold].values
 
                 # Compute the reconciled forecasts
-                self.y_tild_vals, G_mat = compute_y_tilde(
-                    y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True
-                )
+                self.y_tild_vals, G_mat = compute_y_tilde(y_hat_vals, S_mat_vals, self.W_mat, Gmat=Gmat, return_G=True)
 
                 # take the fold on the original df
                 temp_original_df = self.original_df[self.original_df["cv"] == fold + 1]
@@ -519,9 +513,7 @@ class CrossSectionalReconciler(object):
             )
 
             # Give the right format
-            self.reconciled_df = self.reverse_reconciliation_format(
-                self.reconciliation_ready_df, self.original_df
-            )
+            self.reconciled_df = self.reverse_reconciliation_format(self.reconciliation_ready_df, self.original_df)
 
         # Return
         return self.reconciled_df
@@ -682,9 +674,7 @@ class CrossSectionalReconciler(object):
 
         # convert the matrix to a dataframe
         # Using the format of the original dataframe converted to reconciliation format
-        reconciled_df = pd.DataFrame(
-            self.y_tild_vals, index=y_hat_df.index, columns=y_hat_df.columns
-        )
+        reconciled_df = pd.DataFrame(self.y_tild_vals, index=y_hat_df.index, columns=y_hat_df.columns)
 
         # melt
         reconciled_df = reconciled_df.reset_index(names="unique_id").melt(
@@ -695,13 +685,9 @@ class CrossSectionalReconciler(object):
         reconciled_df = reconciled_df.rename(columns={"value": "y_pred"})
 
         # Add the true values and the base forecasts
-        reconciled_df = reconciled_df.merge(original_df, on=["unique_id", "fh"]).rename(
-            columns={"y": "y_base"}
-        )
+        reconciled_df = reconciled_df.merge(original_df, on=["unique_id", "fh"]).rename(columns={"y": "y_base"})
 
         # Add the name
-        reconciled_df["Model"] = (
-            "HR-" + self.reconciliation_method + "-" + reconciled_df["Model"]
-        )
+        reconciled_df["Model"] = "HR-" + self.reconciliation_method + "-" + reconciled_df["Model"]
 
         return reconciled_df
