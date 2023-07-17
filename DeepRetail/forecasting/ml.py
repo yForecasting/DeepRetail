@@ -4,6 +4,7 @@ from DeepRetail.forecasting.utils import (
     add_missing_values,
     create_lags,
     construct_single_rolling_feature,
+    split_lag_targets,
 )
 from DeepRetail.transformations.formats import pivoted_df
 
@@ -50,7 +51,7 @@ class GlobalForecaster(object):
         self.lag_df = create_lags(self.fit_df, self.fixed_lags)
 
         # Split x_train and y_train
-        self.lag_df = self.split_lag_targets(self.lag_df)
+        self.lag_df = split_lag_targets(self.lag_df)
 
         # drop the lag_windows
         self.lag_df = self.lag_df.drop("lag_windows", axis=1)
@@ -127,30 +128,6 @@ class GlobalForecaster(object):
 
         # return
         return self.pred_df
-
-    def split_lag_targets(self, df):
-        """
-        Splits the lagged dataframe into targets and lagged values.
-
-        Args:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data.
-
-        Returns:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data with the targets and lagged values.
-
-        """
-
-        # dimension of targets: (windows, 1)
-        # dimension of lags: (windows, lags)
-
-        # targets are the last value for each window
-        df["targets"] = [subwindows[:, -1].reshape(-1, 1) for subwindows in df["lag_windows"].values]
-        # lagged values are all values until the last one
-        df["lagged_values"] = [subwindows[:, :-1] for subwindows in df["lag_windows"].values]
-
-        return df
 
     def build_rolling_features(self, df):
         # Initialize a df to include all rolling features
