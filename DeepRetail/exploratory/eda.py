@@ -5,11 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 
-from DeepRetail.transformations.formats import (
-    get_reminder,
-    MinMaxScaler_custom,
-    transaction_df,
-)
+from DeepRetail.transformations.formats import get_reminder, StandardScaler_custom, transaction_df, MinMaxScaler_custom
 from tsfeatures import tsfeatures, stl_features, entropy, lumpiness
 from statsmodels.tsa.stattools import pacf, acf
 
@@ -27,7 +23,7 @@ def moving_average(a, n=3):
     """
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
+    return ret[n - 1 :] / n
 
 
 def visualize_series(
@@ -80,9 +76,7 @@ def visualize_series(
                 ma_monthly = moving_average(y, 4)
                 ma_monthly = np.pad(ma_monthly, pad_width=(3, 0), constant_values=None)
                 ma_quarterly = moving_average(y, 13)
-                ma_quarterly = np.pad(
-                    ma_quarterly, pad_width=(12, 0), constant_values=None
-                )
+                ma_quarterly = np.pad(ma_quarterly, pad_width=(12, 0), constant_values=None)
                 ma_annualy = moving_average(y, 52)
                 ma_annualy = np.pad(ma_annualy, pad_width=(51, 0), constant_values=None)
 
@@ -179,9 +173,7 @@ def get_features(df, seasonal_period, periods):
 
     # Estimate the features
 
-    features = tsfeatures(
-        t_df, freq=seasonal_period, features=[stl_features, entropy, lumpiness]
-    )
+    features = tsfeatures(t_df, freq=seasonal_period, features=[stl_features, entropy, lumpiness])
     # Estimate CV here
     features["Residual_CoV"] = Residual_CoV(df, periods).squeeze()
 
@@ -322,9 +314,7 @@ def scatter_hist(df, ax, ax_histx, ax_histy, fig, ax_cor):
 
     # Picks the number of bins automaticaly!
     ax_histx.hist(x, bins=np.histogram_bin_edges(x, bins="auto"))
-    ax_histy.hist(
-        y, bins=np.histogram_bin_edges(y, bins="auto"), orientation="horizontal"
-    )
+    ax_histy.hist(y, bins=np.histogram_bin_edges(y, bins="auto"), orientation="horizontal")
 
     clb = fig.colorbar(im, cax=ax_cor)
     clb.ax.set_title("Volume")
@@ -396,16 +386,10 @@ def plot_level_volume_variance(df, level_threshold=None):
 
     # Estimate non-zero level
     df_non_zero = df[df["y"] != 0]
-    level_df = (
-        df_non_zero.groupby("unique_id")
-        .agg({"y": np.mean})
-        .rename(columns={"y": "Level"})
-    )
+    level_df = df_non_zero.groupby("unique_id").agg({"y": np.mean}).rename(columns={"y": "Level"})
 
     # Merge
-    df_group = pd.merge(
-        level_df, df_group, left_index=True, right_index=True, how="inner"
-    )
+    df_group = pd.merge(level_df, df_group, left_index=True, right_index=True, how="inner")
 
     # Filter on the threshold
     if level_threshold is not None:
@@ -557,9 +541,7 @@ def visualize_pacf(pivoted_df, n, lags, alpha, method="ywm"):
 
             lags_x[0] -= 0.5
             lags_x[-1] += 0.5
-            ax.fill_between(
-                lags_x, confint[:, 0] - pacf_x, confint[:, 1] - pacf_x, alpha=0.25
-            )
+            ax.fill_between(lags_x, confint[:, 0] - pacf_x, confint[:, 1] - pacf_x, alpha=0.25)
 
             gray_scale = 0.93
             ax.set_facecolor((gray_scale, gray_scale, gray_scale))
@@ -637,9 +619,7 @@ def visualize_acf(
 
             lags_x[0] -= 0.5
             lags_x[-1] += 0.5
-            ax.fill_between(
-                lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25
-            )
+            ax.fill_between(lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25)
 
             gray_scale = 0.93
             ax.set_facecolor((gray_scale, gray_scale, gray_scale))
@@ -757,9 +737,7 @@ def plot_seasonal_boxplot(df, x_axis, hue, ax):
         ax (matplotlib.axes._subplots.AxesSubplot): The axis to plot on
     """
     # Plot
-    sns.boxplot(
-        data=df.dropna(), x=x_axis, y="y", hue=hue, ax=ax, showfliers=False, linewidth=1
-    )
+    sns.boxplot(data=df.dropna(), x=x_axis, y="y", hue=hue, ax=ax, showfliers=False, linewidth=1)
 
     # Edit format
     title = f"Seasonal Boxplot: {x_axis} by {hue} average"
@@ -837,7 +815,7 @@ def calendar_heatmap(df, format, by):
 
         # Normalize all values into (-1,1) to have identical scales
         temp_df = pd.DataFrame(
-            MinMaxScaler_custom(temp_df.values),
+            StandardScaler_custom(temp_df.values),
             index=temp_df.index,
             columns=temp_df.columns,
         )
@@ -846,9 +824,7 @@ def calendar_heatmap(df, format, by):
         temp_df = create_features(temp_df, format=format)
 
         # Pivot
-        temp_df = pd.pivot_table(
-            temp_df, index=x_axis, values="y", columns=y_axis, aggfunc="mean"
-        )
+        temp_df = pd.pivot_table(temp_df, index=x_axis, values="y", columns=y_axis, aggfunc="mean")
 
         # Add the plot
         sns.heatmap(
@@ -857,8 +833,6 @@ def calendar_heatmap(df, format, by):
             cmap="seismic",
             linewidth=0.5,
             linecolor="white",
-            vmin=-1,
-            vmax=1,
             cbar=False if year != total_years[-1] else True,
             cbar_ax=None if year != total_years[-1] else cbar_ax,
             ax=ax[0],
