@@ -23,6 +23,7 @@ from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 import dask.dataframe as dd
 from dask.distributed import Client
 from fugue_dask import DaskExecutionEngine
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 
 class StatisticalForecaster(object):
@@ -181,7 +182,7 @@ class StatisticalForecaster(object):
         # Initiate FugueBackend with DaskExecutionEngine if distributed is True
         if self.distributed:
             dask_client = Client()
-            engine = DaskExecutionEngine(dask_client=dask_client) # noqaf841
+            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
@@ -207,9 +208,7 @@ class StatisticalForecaster(object):
         elif format == "transactional":
             fc_df = df.copy()
         else:
-            raise ValueError(
-                "Provide the dataframe either in pivoted or transactional format."
-            )
+            raise ValueError("Provide the dataframe either in pivoted or transactional format.")
 
         # convert to the right format for forecasting
         fc_df = statsforecast_forecast_format(fc_df)
@@ -313,9 +312,7 @@ class StatisticalForecaster(object):
             # We just forecast
             # If we have distributed
             if self.distributed:
-                y_pred = self.forecaster.forecast(
-                    df=self.fc_df, h=self.h
-                ).compute()  # add the compute here
+                y_pred = self.forecaster.forecast(df=self.fc_df, h=self.h).compute()  # add the compute here
             else:
                 y_pred = self.forecaster.forecast(df=self.fc_df, h=self.h)
 
@@ -323,9 +320,7 @@ class StatisticalForecaster(object):
             # Reset index and rename
             y_pred = y_pred.reset_index().rename(columns={"ds": "date"})
             # Melt
-            y_pred = pd.melt(
-                y_pred, id_vars=["unique_id", "date"], var_name="Model", value_name="y"
-            )
+            y_pred = pd.melt(y_pred, id_vars=["unique_id", "date"], var_name="Model", value_name="y")
 
         # Add to the object
         self.forecast_df = y_pred
@@ -334,7 +329,7 @@ class StatisticalForecaster(object):
         self.add_fh_cv()
 
         # Remove the index from the models if there
-        self.forecast_df = self.forecast_df[self.forecast_df['Model'] != 'index']
+        self.forecast_df = self.forecast_df[self.forecast_df["Model"] != "index"]
 
         # return
         return self.forecast_df
@@ -351,26 +346,35 @@ class StatisticalForecaster(object):
         # add the number of cv and fh
         if self.holdout:
             cv_vals = sorted(self.forecast_df["cutoff"].unique())
-            fh_vals = sorted(self.forecast_df["date"].unique())
-
             cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
-            fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
 
-            self.forecast_df["fh"] = [
-                fh_dict[date] for date in self.forecast_df["date"].values
-            ]
-            self.forecast_df["cv"] = [
-                cv_dict[date] for date in self.forecast_df["cutoff"].values
-            ]
+            # Initialize a new dataframe
+            updated_forecast_df = pd.DataFrame()
+
+            # Itterate over cvs
+            for cv in cv_vals:
+                temp_df = self.forecast_df[self.forecast_df["cutoff"] == cv].copy()
+                temp_df["cv"] = cv_dict[cv]
+
+                # take the fh_vals
+                fh_vals = sorted(temp_df["date"].unique())
+                fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
+
+                # add the fh
+                temp_df["fh"] = temp_df["date"].map(fh_dict)
+
+                # Concate
+                updated_forecast_df = pd.concat([updated_forecast_df, temp_df])
+
+            self.forecast_df = updated_forecast_df
+
         else:
             # get the forecasted dates
             dates = self.forecast_df["date"].unique()
             # get a dictionary of dates and their corresponding fh
             fh_dict = dict(zip(dates, np.arange(1, len(dates) + 1)))
             # add the fh
-            self.forecast_df["fh"] = [
-                fh_dict[date] for date in self.forecast_df["date"].values
-            ]
+            self.forecast_df["fh"] = [fh_dict[date] for date in self.forecast_df["date"].values]
             # also add the cv
             self.forecast_df["cv"] = None
 
@@ -432,9 +436,7 @@ class StatisticalForecaster(object):
         total_windows = len(fitting_periods) - self.h + 1
 
         # Pivot the dataframe
-        temp_df = pd.pivot_table(
-            self.fc_df, index="unique_id", columns="ds", values="y", aggfunc="first"
-        )
+        temp_df = pd.pivot_table(self.fc_df, index="unique_id", columns="ds", values="y", aggfunc="first")
 
         # Initialize a df
         temp_residuals = pd.DataFrame()
@@ -459,9 +461,7 @@ class StatisticalForecaster(object):
                     # add the cutoff
                     in_sample_multistep["cutoff"] = fitting_periods[i]
                     # add to the df
-                    in_sample_df = pd.concat(
-                        [in_sample_df, in_sample_multistep], axis=0
-                    )
+                    in_sample_df = pd.concat([in_sample_df, in_sample_multistep], axis=0)
             else:
                 # get the fitted values
                 in_sample_df = fit.fittedvalues.to_frame()
@@ -474,9 +474,7 @@ class StatisticalForecaster(object):
             row.columns = ["y_true"]
             in_sample_df = in_sample_df.merge(row, left_index=True, right_index=True)
             # rename
-            in_sample_df = in_sample_df.rename(
-                columns={"simulation": "y_pred", 0: "y_pred"}
-            )
+            in_sample_df = in_sample_df.rename(columns={"simulation": "y_pred", 0: "y_pred"})
             # reset index
             in_sample_df = in_sample_df.reset_index(names="date")
             # add the cutoff for default tyoe
@@ -618,9 +616,7 @@ class StatisticalForecaster(object):
 
             lags_x[0] -= 0.5
             lags_x[-1] += 0.5
-            ax2.fill_between(
-                lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25
-            )
+            ax2.fill_between(lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25)
 
             gray_scale = 0.93
             ax2.set_facecolor((gray_scale, gray_scale, gray_scale))
@@ -634,3 +630,221 @@ class StatisticalForecaster(object):
             ax3.set_facecolor((gray_scale, gray_scale, gray_scale))
 
             plt.show()
+
+
+class SeasonalDecomposeForecaster(object):
+
+    """
+    A class for time series forecasting by using Seasonal Decomposition and then Statistical forecasting.
+
+    Currently works only when holdout set is given. Can easily be extended for not using holdout sets.
+
+    """
+
+    def __init__(
+        self,
+        models,
+        freq,
+        n_jobs=1,
+        warning=False,
+        seasonal_length=None,
+        distributed=False,
+        n_partitions=None,
+    ):
+        """
+        Initialize the StatisticalForecaster object.
+
+        Args:
+            models: list
+                A list of models to fit. Currently only ETS is implemented.
+            freq: str
+                The frequency of the data, e.g. 'D' for daily or 'M' for monthly.
+            n_jobs: int, default=1
+                The number of jobs to run in parallel for the fitting process.
+            warning: bool, default=False
+                Whether to show warnings or not.
+            seasonal_length: int, default=None
+                The length of the seasonal pattern.
+                If None, the seasonal length is inferred from the frequency.
+                On frequencies with multiple seasonal patterns, the first seasonal pattern is used.
+
+        """
+        self.freq = freq
+        if seasonal_length is not None:
+            self.seasonal_length = seasonal_length
+        else:
+            self.seasonal_length = get_numeric_frequency(freq)
+            # Check if it returns multiple seasonal lengths
+            if isinstance(self.seasonal_length, list):
+                # take the first
+                self.seasonal_length = self.seasonal_length[0]
+        self.n_jobs = n_jobs
+
+        # Set the warnings
+        if not warning:
+            warnings.filterwarnings("ignore")
+
+        self.models = models
+
+        self.distributed = distributed
+        self.n_partitions = n_partitions
+        # Initiate FugueBackend with DaskExecutionEngine if distributed is True
+        if self.distributed:
+            dask_client = Client()
+            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
+
+    def fit(self, df, format="pivoted", fallback=True, verbose=False):
+        """
+        Fit the model to given the data.
+
+        Args:
+            df : pd.DataFrame
+                The input data.
+            format : str, default='pivoted'
+                The format of the input data. Can be 'pivoted' or 'transactional'.
+            fallback : bool, default=True
+                Whether to fallback to the default model if the model fails to fit.
+                Default selection is Naive
+            verbose : bool, default=False
+                Whether to show the progress of the model fitting.
+        Raises:
+            ValueError : If the format is not 'pivoted' or 'transactional'.
+
+        """
+
+        # Extract the seasonalities
+        self.seasonal_adjusted_df, seasonalities_df = self.extract_seasonalities(df, self.seasonal_length)
+
+        # Collapse the seasonalities
+        # Collapse it
+        self.seasonalities_df = transaction_df(seasonalities_df).rename(columns={"y": "seasonality"})
+
+        # Define and fit the statistical forecaster
+        self.forecaster = StatisticalForecaster(
+            models=self.models,
+            freq=self.freq,
+            n_jobs=self.n_jobs,
+            warning=False,
+            distributed=self.distributed,
+            n_partitions=self.n_partitions,
+            seasonal_length=self.seasonal_length,
+        )
+
+        # Fit the forecaster
+        self.forecaster.fit(self.seasonal_adjusted_df, fallback=fallback, verbose=verbose)
+
+    def predict(self, h, cv=1, step_size=1, refit=True, holdout=True):
+        """
+        Generates predictions using the statistical forecaster.
+
+        Args:
+            h : int
+                The forecast horizon (i.e., how many time periods to forecast into the future).
+            cv : int, optional (default=1)
+                The number of cross-validation folds to use. If set to 1, no cross-validation is performed.
+            step_size : int, optional (default=1)
+                The step size to use for cross-validation. If set to 1, the cross-validation folds are non-overlapping
+            refit : bool, optional (default=True)
+                Weather to refit the model at each cross-validation. Avoid for big datasets.
+            holdout : bool, optional (default=True)
+                If True, a holdout set is used for testing the model. If False, the model is fit on the entire data.
+
+        Raises:
+            ValueError : If cv > 1 and holdout is False.
+
+        Returns:
+            pandas.DataFrame
+            The forecasted values, along with the true values (if holdout=True).
+
+        """
+
+        # Generate predictions
+        forecast_df = self.forecaster.predict(h, cv=cv, step_size=step_size, refit=refit, holdout=holdout)
+
+        if holdout is True:
+            # Generate predictions
+            # forecast_df = self.forecaster.predict(h, cv=cv, step_size=step_size, refit=refit, holdout=holdout)
+
+            # Merge with the forecast_df
+            forecast_df = pd.merge(forecast_df, self.seasonalities_df, on=["date", "unique_id"])
+
+        else:
+            # First forecast seasonalities
+            temp_seas = pd.pivot_table(self.seasonalities_df, index="unique_id", columns="date", values="seasonality")
+
+            # define a seasonal forecaster
+            seasonal_forecaster = StatisticalForecaster(models=["SNaive"], freq=self.freq)
+            seasonal_forecaster.fit(temp_seas)
+
+            # Predict for h steps ahead
+            seasonal_prediction = (
+                seasonal_forecaster.predict(h=h, holdout=False)
+                .rename(columns={"y": "seasonality"})
+                .drop(columns=["Model", "fh", "cv"])
+            )
+
+            # Merge with the forecast_df
+            forecast_df = pd.merge(forecast_df, seasonal_prediction, on=["unique_id", "date"])
+
+        # Make the seasonal correcation
+        forecast_df["y"] = forecast_df["y"] + forecast_df["seasonality"]
+
+        # Drop the seasonality
+        forecast_df = forecast_df.drop(columns=["seasonality"])
+
+        # Add the "Decomposed_" on the Model
+        forecast_df["Model"] = "Decomposed_" + forecast_df["Model"]
+
+        return forecast_df
+
+    def extract_seasonalities(self, df, seasonal_length):
+        """
+        Extracts the seasonalities from the data.
+
+        Args:
+            df : pd.DataFrame
+                The input data.
+            seasonal_length : int
+                The length of the seasonal pattern.
+
+        Returns:
+            seasonal_adjusted_df : pd.DataFrame
+                The data with the seasonalities removed.
+            seasonalities_df : pd.DataFrame
+                The extracted seasonalities.
+
+        """
+
+        seasonal_adjusted_list = []
+        seasonalities_list = []
+
+        for idx, row in df.iterrows():
+            temp_seasonality = seasonal_decompose(row, model="additive", period=seasonal_length).seasonal
+            temp_seasonal_adjusted = row - temp_seasonality
+
+            seasonal_adjusted_list.append(temp_seasonal_adjusted)
+            seasonalities_list.append(temp_seasonality)
+
+        seasonal_adjusted_df = pd.DataFrame(seasonal_adjusted_list, index=df.index, columns=df.columns)
+        seasonalities_df = pd.DataFrame(seasonalities_list, index=df.index, columns=df.columns)
+
+        return seasonal_adjusted_df, seasonalities_df
+
+    def calculate_residuals(self):
+        """
+        Calculates the residuals of the model.
+        Temporal method. Not stable for now.
+
+        Args:
+
+
+        Returns:
+            residuals_df : pd.DataFrame
+                The residuals of the model.
+
+        """
+
+        # Calculate the residuals
+        residuals_df = self.forecaster.calculate_residuals()
+
+        return residuals_df
