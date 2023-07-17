@@ -82,9 +82,7 @@ def add_missing_values(input_features, input_transformations=None):
 
     # Default values for features and transformations dictionaries
     # Initialize a dictionary for transformations if it is none
-    input_transformations = (
-        {} if input_transformations is None else input_transformations
-    )
+    input_transformations = {} if input_transformations is None else input_transformations
 
     features = {
         "lags": None,
@@ -175,9 +173,7 @@ def window(a, window_size):
     # Calculate the strides for the windowed array
     st = a.strides * 2
     # Create the windowed array using as_strided method
-    view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[
-        0::1
-    ]  # The step size is 1, i.e. no overlapping
+    view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[0::1]  # The step size is 1, i.e. no overlapping
     return view
 
 
@@ -198,27 +194,17 @@ def create_lags(df, lags):
 
     """
 
-    lags_df = df.apply(lambda x: augment(x.values, lags).squeeze(), axis=1).to_frame(
-        name="lag_windows"
-    )
+    lags_df = df.apply(lambda x: augment(x.values, lags).squeeze(), axis=1).to_frame(name="lag_windows")
 
     return lags_df
 
 
-def construct_single_rolling_feature(
-    df, rolling_aggregation, original_lags, rolling_windows, rolling_lags=1
-):
+def construct_single_rolling_feature(df, rolling_aggregation, original_lags, rolling_windows, rolling_lags=1):
     # Check if rolling_window is integer and convert to list
-    rolling_windows = (
-        [rolling_windows] if isinstance(rolling_windows, int) else rolling_windows
-    )
+    rolling_windows = [rolling_windows] if isinstance(rolling_windows, int) else rolling_windows
 
     # In case rolling_lags has a single value, repeat it for the number of rolling windows
-    rolling_lags = (
-        np.repeat(rolling_lags, len(rolling_windows))
-        if isinstance(rolling_lags, int)
-        else rolling_lags
-    )
+    rolling_lags = np.repeat(rolling_lags, len(rolling_windows)) if isinstance(rolling_lags, int) else rolling_lags
 
     # Initialize a dataframe to include all rolling features
     rolling_df = pd.DataFrame()
@@ -234,10 +220,7 @@ def construct_single_rolling_feature(
         temp_df = create_lags(temp_df, original_lags)
         # Keep only the specified amount and round the subwindow
         # temp_df['lag_windows'] = [subwindows[:, -temp_lag:] for subwindows in temp_df['lag_windows'].values]
-        temp_df["lag_windows"] = [
-            subwindows[:, -temp_lag:].round(3)
-            for subwindows in temp_df["lag_windows"].values
-        ]
+        temp_df["lag_windows"] = [subwindows[:, -temp_lag:].round(3) for subwindows in temp_df["lag_windows"].values]
         # rename
         temp_df = temp_df.rename(columns={"lag_windows": name})
 
@@ -246,3 +229,39 @@ def construct_single_rolling_feature(
 
     # return]
     return rolling_df
+
+
+def split_lag_targets(df, test_size=1):
+    """
+    Splits the lagged dataframe into targets and lagged values.
+
+    Args:
+        df (pd.DataFrame):
+            A dataframe containing the lagged time series data.
+        test_size (int):
+            The number of windows to be used for testing.
+
+    Returns:
+        df (pd.DataFrame):
+            A dataframe containing the lagged time series data with the targets and lagged values.
+
+    """
+
+    # dimension of targets: (windows, 1)
+    # dimension of lags: (windows, lags)
+
+    # Fix an issue for when we have just a single lag
+    if len(df["lag_windows"].values[0].shape) == 1:
+        # reshape all the lag windows
+        df["lag_windows"] = df["lag_windows"].apply(lambda x: x.reshape(1, -1))
+
+    # targets are the last value for each window
+    if test_size == 1:
+        df["targets"] = [subwindows[:, -1].reshape(-1, 1) for subwindows in df["lag_windows"].values]
+    else:
+        df["targets"] = [subwindows[:, -test_size:] for subwindows in df["lag_windows"].values]
+
+    # lagged values are all values until the last one
+    df["lagged_values"] = [subwindows[:, :-test_size] for subwindows in df["lag_windows"].values]
+
+    return df
