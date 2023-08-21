@@ -137,3 +137,10 @@ DeepRetail/data/data_folder/
 DeepRetail/example_notebooks/load_company_data
 DeepRetail/example_notebooks/experiment
 DeepRetail/example_notebooks/experiment/complete_experiment
+DeepRetail/example_notebooks/sample_for_developers.ipynb
+DeepRetail/example_notebooks/forecasts_sample.csv
+DeepRetail/m5_month_sample_for_students.csv
+DeepRetail/example_notebooks/forecasts_sample.csv
+.vscode
+DeepRetail/m5_month_sample_for_students.csv:Zone.Identifier
+DeepRetail/example_notebooks/sample_for_developers.ipynb

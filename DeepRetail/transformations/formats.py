@@ -433,3 +433,29 @@ def MinMaxScaler_custom(x, feature_range=(0, 1)):
     X_scaled = X_std * (feature_max - feature_min) + feature_min
 
     return X_scaled
+
+
+def StandardScaler_custom(x):
+    """
+    Performs StandardScaling on a numpy array.
+    Follows the documentation from sklearn.
+
+    Args:
+        x (np.array):
+            The array to be scaled.
+
+    Returns:
+        np.array:
+            The scaled array.
+
+    References:
+         https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+    """
+
+    # Extract some values
+    x_mean, x_std = x.mean(), x.std()
+
+    # Perform scalling
+    X_scaled = (x - x_mean) / x_std
+
+    return X_scaled

@@ -1,5 +1,5 @@
 from DeepRetail.forecasting.utils import get_numeric_frequency
-from DeepRetail.forecasting.statistical import StatisticalForecaster
+from DeepRetail.forecasting.statistical import StatisticalForecaster, SeasonalDecomposeForecaster
 from DeepRetail.reconciliation.utils import (
     get_factors,
     compute_resampled_frequencies,
@@ -83,9 +83,7 @@ class TemporalReconciler(object):
         >>> reconciled = temporal_reconciler.reconcile('struc')
     """
 
-    def __init__(
-        self, bottom_level_freq, factors=None, top_fh=1, holdout=False, cv=None
-    ):
+    def __init__(self, bottom_level_freq, factors=None, top_fh=1, holdout=False, cv=None):
         """
         Initializes the TemporalReconciler class.
 
@@ -153,9 +151,7 @@ class TemporalReconciler(object):
         temp_df = self.base_fc_df.copy()
 
         # Add the temporal indexer to identify temporal levels
-        temp_df["temp_indexer"] = (
-            temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
-        )
+        temp_df["temp_indexer"] = temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
 
         # Add the model to the unique_id
         temp_df["unique_id_model"] = temp_df["unique_id"] + "~" + temp_df["Model"]
@@ -203,9 +199,7 @@ class TemporalReconciler(object):
 
         # For structural scalling
         if reconciliation_method == "struc":
-            Wmat = get_w_matrix_structural(
-                self.frequencies, len(self.reconciliation_ready_df)
-            )
+            Wmat = get_w_matrix_structural(self.frequencies, len(self.reconciliation_ready_df))
 
         elif reconciliation_method == "mse":
             if residual_df is None:
@@ -216,9 +210,7 @@ class TemporalReconciler(object):
 
             # Groupby unique_id, temporal_level and fh and get the Mean Squared Error
             residual_df = (
-                residual_df.groupby(["unique_id", "temporal_level"])
-                .agg({"residual_squarred": "mean"})
-                .reset_index()
+                residual_df.groupby(["unique_id", "temporal_level"]).agg({"residual_squarred": "mean"}).reset_index()
             )
 
             # Get the matrix W
@@ -250,10 +242,7 @@ class TemporalReconciler(object):
         cols = self.reconciliation_ready_df.columns
 
         # For every set of base forecasts reconcile using the reconciliation function compute_y_tilde
-        reconciled_values = [
-            compute_y_tilde(y, self.Smat, mat, return_G=False)
-            for y, mat in zip(values, self.Wmat)
-        ]
+        reconciled_values = [compute_y_tilde(y, self.Smat, mat, return_G=False) for y, mat in zip(values, self.Wmat)]
 
         # Convert to dataframe
         reconciled_df = pd.DataFrame(reconciled_values, index=ids, columns=cols)
@@ -277,9 +266,7 @@ class TemporalReconciler(object):
 
         # Prepare the base forecasts
         # Get the temp indexer
-        temp_df["temp_indexer"] = (
-            temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
-        )
+        temp_df["temp_indexer"] = temp_df["temporal_level"].astype(str) + "_" + temp_df["fh"].astype(str)
 
         # Melt the reconciled dataframe
         reco_df = reco_df.reset_index()
@@ -292,12 +279,8 @@ class TemporalReconciler(object):
         )
 
         # Split the unique id and the model
-        reco_df["unique_id"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("~")[0]
-        )
-        reco_df["Base_Model"] = reco_df["unique_id_model"].apply(
-            lambda x: x.split("~")[1]
-        )
+        reco_df["unique_id"] = reco_df["unique_id_model"].apply(lambda x: x.split("~")[0])
+        reco_df["Base_Model"] = reco_df["unique_id_model"].apply(lambda x: x.split("~")[1])
 
         # Add the Model
         reco_df["Model"] = "TR" + "-" + reco_method + "-" + reco_df["Base_Model"]
@@ -489,9 +472,7 @@ class THieF(object):
 
     """
 
-    def __init__(
-        self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None
-    ):
+    def __init__(self, bottom_level_freq, factors=None, top_fh=1, holdout=True, cv=None):
         """
         Initializes the THieF class.
         It constructs the temporal levels and assigns fundamental parameters.
@@ -541,9 +522,7 @@ class THieF(object):
         # self.level_indices = np.cumsum(self.fhs)
 
         # Get the resampled frequencies for upscaling the data
-        self.resampled_factors = compute_resampled_frequencies(
-            self.factors, self.bottom_level_freq
-        )
+        self.resampled_factors = compute_resampled_frequencies(self.factors, self.bottom_level_freq)
 
         # Construct the Smat
         self.Smat = compute_matrix_S_temporal(self.factors)
@@ -572,9 +551,7 @@ class THieF(object):
         """
 
         # Ensure we have the right format
-        original_df = (
-            pivoted_df(original_df) if format == "transaction" else original_df
-        )
+        original_df = pivoted_df(original_df) if format == "transaction" else original_df
 
         # In this method I build the hierarchy
         # I need to see how I will use the holdout and the cv paremeter
@@ -610,10 +587,7 @@ class THieF(object):
                     for i, j in zip(self.factors, self.resampled_factors)
                 ]
                 # Convert to dictionary with factors as keys
-                self.resampled_dfs = {
-                    self.factors[i]: temp_resampled_train_df[i]
-                    for i in range(len(self.factors))
-                }
+                self.resampled_dfs = {self.factors[i]: temp_resampled_train_df[i] for i in range(len(self.factors))}
 
                 # add to list
                 self.resampled_train_dfs.append(self.resampled_dfs)
@@ -622,9 +596,7 @@ class THieF(object):
                 # I also melt to merge right away
                 temp_resampled_test_df = [
                     (
-                        resample_temporal_level(
-                            temp_test_df, i, self.bottom_level_freq, j
-                        )
+                        resample_temporal_level(temp_test_df, i, self.bottom_level_freq, j)
                         .reset_index()
                         .melt(id_vars="unique_id", value_name="y_true", var_name="date")
                     )
@@ -653,11 +625,9 @@ class THieF(object):
             ]
 
             # convert it to a dictionary with the factors as keys
-            self.resampled_dfs = {
-                self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))
-            }
+            self.resampled_dfs = {self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))}
 
-    def predict(self, models, to_return=True, n_jobs=1):
+    def predict(self, models, to_return=True, n_jobs=1, decompose=True):
         """
         Generates base forecasts for each temporal level
 
@@ -673,6 +643,8 @@ class THieF(object):
             n_jobs (int, optional):
                 The number of cores to run in parallel.
                 Default is 1.
+            decompose (bool, optional):
+                Whether to decompose the series or not.
 
         Returns:
             pd.DataFrame:
@@ -689,9 +661,7 @@ class THieF(object):
             models = {i: models for i in self.factors}
         # Check if we have enough models
         elif len(models) != len(self.factors):
-            raise ValueError(
-                "The number of models should be equal to the number of factors"
-            )
+            raise ValueError("The number of models should be equal to the number of factors")
 
         # If we have holdout
         if self.holdout:
@@ -705,26 +675,35 @@ class THieF(object):
 
                 # Initialize a StatisticalForecaster for each factor
                 # Currently only supporting StatisticalForecaster
-                self.base_forecasters = {
-                    factor: StatisticalForecaster(
-                        models=models[factor],
-                        freq=self.resampled_factors[i],
-                        n_jobs=n_jobs,
-                    )
-                    for i, factor in enumerate(self.factors)
-                }
+
+                # If we perform decomposition
+                if decompose:
+                    self.base_forecasters = {
+                        factor: SeasonalDecomposeForecaster(
+                            models=models[factor],
+                            freq=self.resampled_factors[i],
+                            n_jobs=n_jobs,
+                        )
+                        for i, factor in enumerate(self.factors)
+                    }
+
+                else:
+                    self.base_forecasters = {
+                        factor: StatisticalForecaster(
+                            models=models[factor],
+                            freq=self.resampled_factors[i],
+                            n_jobs=n_jobs,
+                        )
+                        for i, factor in enumerate(self.factors)
+                    }
 
                 # Fit
                 for factor in self.factors:
-                    self.base_forecasters[factor].fit(
-                        self.resampled_dfs[factor], format="pivoted"
-                    )
+                    self.base_forecasters[factor].fit(self.resampled_dfs[factor], format="pivoted")
 
                 # Generate base forecasts
                 temp_base_forecasts = {
-                    factor: self.base_forecasters[factor].predict(
-                        h=self.frequencies[i], holdout=False
-                    )
+                    factor: self.base_forecasters[factor].predict(h=self.frequencies[i], holdout=False)
                     for i, factor in enumerate(self.factors)
                 }
 
@@ -778,18 +757,30 @@ class THieF(object):
         else:
             # Initialize a StatisticalForecaster for each factor
             # Currently only supporting StatisticalForecaster
-            self.base_forecasters = {
-                factor: StatisticalForecaster(
-                    models=models[factor], freq=self.resampled_factors[i], n_jobs=n_jobs
-                )
-                for i, factor in enumerate(self.factors)
-            }
+            # If we perform decomposition
+            if decompose:
+                self.base_forecasters = {
+                    factor: SeasonalDecomposeForecaster(
+                        models=models[factor],
+                        freq=self.resampled_factors[i],
+                        n_jobs=n_jobs,
+                    )
+                    for i, factor in enumerate(self.factors)
+                }
+
+            else:
+                self.base_forecasters = {
+                    factor: StatisticalForecaster(
+                        models=models[factor],
+                        freq=self.resampled_factors[i],
+                        n_jobs=n_jobs,
+                    )
+                    for i, factor in enumerate(self.factors)
+                }
 
             # Fit the forecasters
             for factor in self.factors:
-                self.base_forecasters[factor].fit(
-                    self.resampled_dfs[factor], format="pivoted"
-                )
+                self.base_forecasters[factor].fit(self.resampled_dfs[factor], format="pivoted")
 
             # Generate base forecasts
             temp_base_forecasts = {
@@ -806,9 +797,7 @@ class THieF(object):
             # Reset index and drop column from multi-index
             # Also rename the remaining index to get the temporal level
             self.base_forecasts = (
-                self.base_forecasts.reset_index()
-                .drop("level_1", axis=1)
-                .rename(columns={"level_0": "temporal_level"})
+                self.base_forecasts.reset_index().drop("level_1", axis=1).rename(columns={"level_0": "temporal_level"})
             )
 
             # Get the residuals here
@@ -866,19 +855,14 @@ class THieF(object):
                 The residuals for each base forecaster on every temporal level.
         """
         # Estimate residuals for all base forecasters
-        temp_residuals = {
-            factor: self.base_forecasters[factor].calculate_residuals()
-            for factor in self.factors
-        }
+        temp_residuals = {factor: self.base_forecasters[factor].calculate_residuals() for factor in self.factors}
 
         # concat
         temp_residuals = pd.concat(temp_residuals, axis=0)
 
         # add to the right format
         temp_residuals = (
-            temp_residuals.reset_index()
-            .drop("level_1", axis=1)
-            .rename(columns={"level_0": "temporal_level"})
+            temp_residuals.reset_index().drop("level_1", axis=1).rename(columns={"level_0": "temporal_level"})
         )
 
         # Calculate residuals
@@ -922,9 +906,7 @@ class THieF(object):
         self.temporal_reconciler.fit(self.base_forecasts)
 
         # Reconcile
-        self.reconciled_df = self.temporal_reconciler.reconcile(
-            method, residual_df=self.base_forecast_residuals
-        )
+        self.reconciled_df = self.temporal_reconciler.reconcile(method, residual_df=self.base_forecast_residuals)
 
         # Merge with the base forecasts
         return self.reconciled_df

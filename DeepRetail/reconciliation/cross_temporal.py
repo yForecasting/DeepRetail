@@ -233,7 +233,7 @@ class C_THieF(object):
             main_CHieF.S_mat,
         )
 
-    def predict(self, models):
+    def predict(self, models, decompose=False):
         """
         Generates base forecasts for each temporal level on every cross-section
 
@@ -243,6 +243,9 @@ class C_THieF(object):
                 It can be either a string or a dictionary.
                 If it is a string, the same model will be used for all temporal levels.
                 If it is a dictionary, the keys should be the temporal levels and the values the models.
+
+            decompose (bool, optional):
+                Whether to perform seasonal decomposition or not.
 
         Returns:
             base_fc (pd.DataFrame):
@@ -261,9 +264,7 @@ class C_THieF(object):
             models = {i: models for i in self.factors}
         # Check if we have enough models
         elif len(models) != len(self.factors):
-            raise ValueError(
-                "The number of models should be equal to the number of factors"
-            )
+            raise ValueError("The number of models should be equal to the number of factors")
 
         # Define and fit the initial THieF
         self.main_THieF = THieF(
@@ -274,7 +275,7 @@ class C_THieF(object):
         self.main_THieF.fit(self.h_df, format="pivoted")  # format is always pivoted
 
         # Get base forecasts and residuals
-        self.base_fc = self.main_THieF.predict(models)
+        self.base_fc = self.main_THieF.predict(models, decompose=decompose)
 
         # Get residuals
         self.residuals = self.main_THieF.base_forecast_residuals
@@ -315,7 +316,7 @@ class C_THieF(object):
 
         # Define the reconciler
         self.ct_reco = CrossTemporalReconciler(
-            self.bottom_level_freq, factors=self.factors,  h=self.h, holdout=self.holdout, cv=self.cv
+            self.bottom_level_freq, factors=self.factors, h=self.h, holdout=self.holdout, cv=self.cv
         )
 
         # Fit the reconciler
@@ -519,13 +520,9 @@ class CrossTemporalReconciler(object):
 
         # Ensure we have the "temporal_level" and the cross_sectional_level columns
         if "temporal_level" not in base_fc.columns:
-            raise ValueError(
-                "The base forecasts should have the correspoding temporal level"
-            )
+            raise ValueError("The base forecasts should have the correspoding temporal level")
         if "cross_sectional_level" not in base_fc.columns:
-            raise ValueError(
-                "The base forecasts should have the correspoding cross-sectional level"
-            )
+            raise ValueError("The base forecasts should have the correspoding cross-sectional level")
 
         # Add to the object
         self.base_fc = base_fc
@@ -599,8 +596,7 @@ class CrossTemporalReconciler(object):
 
                 # We get the bottom level of the temporally reconciled predictions
                 self.temporaly_reconciled_bottom = temporaly_reconciled[
-                    temporaly_reconciled["temporal_level"]
-                    == temporaly_reconciled["temporal_level"].min()
+                    temporaly_reconciled["temporal_level"] == temporaly_reconciled["temporal_level"].min()
                 ]
 
                 # We reconcile cross-sectionally using G_bar
@@ -612,18 +608,12 @@ class CrossTemporalReconciler(object):
                     cv=1,  # passing jsut one here
                 )
                 # fit the reconciler
-                self.cross_temporal_reconciler.fit(
-                    self.temporaly_reconciled_bottom, s_mat=self.cross_sectional_Smat
-                )
+                self.cross_temporal_reconciler.fit(self.temporaly_reconciled_bottom, s_mat=self.cross_sectional_Smat)
                 # Reconcile
-                cross_sectionaly_reconciled = self.cross_temporal_reconciler.reconcile(
-                    method="custom", Gmat=self.G_bar
-                )
+                cross_sectionaly_reconciled = self.cross_temporal_reconciler.reconcile(method="custom", Gmat=self.G_bar)
 
                 # Finally we S-up to get the cross-temporally reconciled predictions.
-                cross_temporaly_reconciled = self.S_up(
-                    cross_sectionaly_reconciled, temporaly_reconciled
-                )
+                cross_temporaly_reconciled = self.S_up(cross_sectionaly_reconciled, temporaly_reconciled)
 
                 # We add the cv
                 cross_temporaly_reconciled["cv"] = cv
@@ -654,8 +644,7 @@ class CrossTemporalReconciler(object):
 
             # We get the bottom level of the temporally reconciled predictions
             self.temporaly_reconciled_bottom = temporaly_reconciled[
-                temporaly_reconciled["temporal_level"]
-                == temporaly_reconciled["temporal_level"].min()
+                temporaly_reconciled["temporal_level"] == temporaly_reconciled["temporal_level"].min()
             ]
 
             # We reconcile cross-sectionally using G_bar
@@ -667,24 +656,16 @@ class CrossTemporalReconciler(object):
                 cv=self.cv,
             )
             # fit the reconciler
-            self.cross_temporal_reconciler.fit(
-                self.temporaly_reconciled_bottom, s_mat=self.cross_sectional_Smat
-            )
+            self.cross_temporal_reconciler.fit(self.temporaly_reconciled_bottom, s_mat=self.cross_sectional_Smat)
             # Reconcile
-            self.cross_sectionaly_reconciled = self.cross_temporal_reconciler.reconcile(
-                method="custom", Gmat=G_bar
-            )
+            self.cross_sectionaly_reconciled = self.cross_temporal_reconciler.reconcile(method="custom", Gmat=G_bar)
 
             # Finally we S-up to get the cross-temporally reconciled predictions.
-            self.cross_temporaly_reconciled = self.S_up(
-                self.cross_sectionaly_reconciled, temporaly_reconciled
-            )
+            self.cross_temporaly_reconciled = self.S_up(self.cross_sectionaly_reconciled, temporaly_reconciled)
 
         return self.cross_temporaly_reconciled
 
-    def temporal_reconciliation(
-        self, base_fc_fold, temporal_method, residual_fold=None
-    ):
+    def temporal_reconciliation(self, base_fc_fold, temporal_method, residual_fold=None):
         """
         Reconciles temporally for each cross-sectional level.
 
@@ -711,15 +692,11 @@ class CrossTemporalReconciler(object):
         # Iterate through the cross-sectional levels
         for level in cross_sectional_levels:
             # filter on the level
-            base_fc_cross_section_level = base_fc_fold[
-                base_fc_fold["cross_sectional_level"] == level
-            ]
+            base_fc_cross_section_level = base_fc_fold[base_fc_fold["cross_sectional_level"] == level]
 
             # I should also filter the residuals here if given
             if residual_fold is not None:
-                residual_cross_section_level = residual_fold[
-                    residual_fold["cross_sectional_level"] == level
-                ]
+                residual_cross_section_level = residual_fold[residual_fold["cross_sectional_level"] == level]
 
             # Sort based on the temporal level and the fh
             base_fc_cross_section_level = base_fc_cross_section_level.sort_values(
@@ -727,9 +704,7 @@ class CrossTemporalReconciler(object):
             )
 
             # Define a reconciler
-            temp_cv = (
-                1 if self.holdout else None
-            )  # We dont want multiple cvs here we iterate outside the function
+            temp_cv = 1 if self.holdout else None  # We dont want multiple cvs here we iterate outside the function
             self.dummy_temporal_reconciler = TemporalReconciler(
                 bottom_level_freq=self.bottom_level_freq,
                 factors=self.factors,
@@ -749,9 +724,7 @@ class CrossTemporalReconciler(object):
             temp_temporaly_reconciled["cross_sectional_level"] = level
 
             # Concat
-            temporaly_reconciled = pd.concat(
-                [temporaly_reconciled, temp_temporaly_reconciled]
-            )
+            temporaly_reconciled = pd.concat([temporaly_reconciled, temp_temporaly_reconciled])
 
             # Assigns the smat to the object for later use
             self.temporal_Smat = self.dummy_temporal_reconciler.Smat
@@ -759,9 +732,7 @@ class CrossTemporalReconciler(object):
         # return
         return temporaly_reconciled
 
-    def get_cross_sectional_G_matrices(
-        self, temporaly_reconciled, cross_sectional_method, residual_df=None
-    ):
+    def get_cross_sectional_G_matrices(self, temporaly_reconciled, cross_sectional_method, residual_df=None):
         """
         Estimates the G matrix used for cross-sectional reconciliation on each temporal level.
 
@@ -791,24 +762,16 @@ class CrossTemporalReconciler(object):
         # Iterate over the temporal levels
         for level in temporal_levels:
             # filter
-            base_fc_temporal_level = temporaly_reconciled[
-                temporaly_reconciled["temporal_level"] == level
-            ]
+            base_fc_temporal_level = temporaly_reconciled[temporaly_reconciled["temporal_level"] == level]
 
             # I should also filter the residuals here if given
             if residual_df is not None:
-                residual_df_temporal_level = residual_df[
-                    residual_df["temporal_level"] == level
-                ]
+                residual_df_temporal_level = residual_df[residual_df["temporal_level"] == level]
 
             # Take the bottom_level and the forecast horizon h
-            temp_bottom_level = convert_offset_to_lower_freq(
-                str(level) + self.bottom_level_freq
-            )
+            temp_bottom_level = convert_offset_to_lower_freq(str(level) + self.bottom_level_freq)
             temp_h = len(base_fc_temporal_level["fh"].unique())
-            temp_cv = (
-                1 if self.holdout else None
-            )  # We dont want multiple cvs here we iterate outside the function
+            temp_cv = 1 if self.holdout else None  # We dont want multiple cvs here we iterate outside the function
             # Define a reconciler
             dummy_cross_sectional_reconciler = CrossSectionalReconciler(
                 bottom_level_freq=temp_bottom_level,
@@ -819,9 +782,7 @@ class CrossTemporalReconciler(object):
 
             # Fit the reconciler.
             # We use the same s mat for all levels
-            dummy_cross_sectional_reconciler.fit(
-                base_fc_temporal_level, s_mat=self.cross_sectional_Smat
-            )
+            dummy_cross_sectional_reconciler.fit(base_fc_temporal_level, s_mat=self.cross_sectional_Smat)
             # Reconcile
             _ = dummy_cross_sectional_reconciler.reconcile(
                 method=cross_sectional_method,
@@ -858,14 +819,10 @@ class CrossTemporalReconciler(object):
         # Prepare the base forecasts
         # Get the temp indexer
         total_reconciled_temporal["temp_indexer"] = (
-            total_reconciled_temporal["temporal_level"].astype(str)
-            + "_"
-            + total_reconciled_temporal["fh"].astype(str)
+            total_reconciled_temporal["temporal_level"].astype(str) + "_" + total_reconciled_temporal["fh"].astype(str)
         )
         # Rename the column from y to indicate temporal reconciliation
-        total_reconciled_temporal = total_reconciled_temporal.rename(
-            columns={"y": "y_rec_temporal"}
-        )
+        total_reconciled_temporal = total_reconciled_temporal.rename(columns={"y": "y_rec_temporal"})
 
         # Prepare for S-UP
         # Pivot
@@ -881,9 +838,7 @@ class CrossTemporalReconciler(object):
         temp_pivot = temp_pivot.reindex(sorted(temp_pivot.columns), axis=1)
 
         # S_up with the S matrix from temporal reconciliation
-        temporaly_reconciled_values = np.array(
-            [self.temporal_Smat @ ts for ts in temp_pivot.values]
-        )
+        temporaly_reconciled_values = np.array([self.temporal_Smat @ ts for ts in temp_pivot.values])
 
         # Convert to dataframe
         temporaly_reconciled_df = pd.DataFrame(

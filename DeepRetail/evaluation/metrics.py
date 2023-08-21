@@ -118,7 +118,10 @@ def percentage_error(actual, predicted, *args, **kwargs):
 
     # % Error
     # in case the actual is zero return zero
-    error = simple_error(actual, predicted, **kwargs)/actual if actual != 0 else 0
+    # error = simple_error(actual, predicted, **kwargs)/actual if actual != 0 else 0
+
+    error = [simple_error(y, y_hat, **kwargs) / y if y != 0 else 0 for y, y_hat in zip(actual, predicted)]
+
     return error
 
 
@@ -217,9 +220,7 @@ def smape(actual, predicted, *args, **kwargs):
         np.array: The symmetric mean absolute percentage error.
     """
     # Symmetric mape
-    error = (
-        2.0 * np.abs(actual - predicted) / ((np.abs(actual) + np.abs(predicted)) + e)
-    )
+    error = 2.0 * np.abs(actual - predicted) / ((np.abs(actual) + np.abs(predicted)) + e)
     return np.mean(error)
 
 
@@ -305,5 +306,5 @@ def rmsse(actual, predicted, naive_mse=None, train=None, lag=1, *args, **kwargs)
     else:
         raise ValueError("Provide in-sample mse or the training data ")
     # error = np.sqrt(num / np.maximum(denom, e))
-    error = np.sqrt(num/denom) if denom != 0 else 0
+    error = np.sqrt(num / denom) if denom != 0 else 0
     return error

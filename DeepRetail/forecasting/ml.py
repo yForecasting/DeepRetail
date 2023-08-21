@@ -4,6 +4,7 @@ from DeepRetail.forecasting.utils import (
     add_missing_values,
     create_lags,
     construct_single_rolling_feature,
+    split_lag_targets,
 )
 from DeepRetail.transformations.formats import pivoted_df
 
@@ -28,31 +29,36 @@ class GlobalForecaster(object):
         # dates = input_df.columns.values
         # total_windows = len(dates) - features['lags']
 
-    def fit(self, df, covariates=None, format='pivoted'):
-
-        if format == 'transaction':
+    def fit(self, df, test_size=None, covariates=None, format="pivoted"):
+        if format == "transaction":
             df = pivoted_df(df)
-        elif format == 'pivoted':
+        elif format == "pivoted":
             pass
         else:
             raise ValueError('format must be either "transaction" or "pivoted"')
 
         # Fits the and trains the model
-
+        # Keep the original df for later to build the predictions.
         self.input_df = df
 
+        # Keep the test set asside
+        if test_size is not None:
+            self.fit_df = df.iloc[:, :-test_size]
+        else:
+            self.fit_df = df
+
         # Create the lagged dataframe
-        self.lag_df = create_lags(df, self.fixed_lags)
+        self.lag_df = create_lags(self.fit_df, self.fixed_lags)
 
         # Split x_train and y_train
-        self.lag_df = self.split_lag_targets(self.lag_df)
+        self.lag_df = split_lag_targets(self.lag_df)
 
         # drop the lag_windows
         self.lag_df = self.lag_df.drop("lag_windows", axis=1)
 
         # Create the rolling features
         if self.features["rolling_features"] is not None:
-            rolling_df = self.build_rolling_features(self.input_df)
+            rolling_df = self.build_rolling_features(self.fit_df)
 
             # Merge the two dfs
             self.lag_df = pd.concat([self.lag_df, rolling_df], axis=1)
@@ -68,21 +74,14 @@ class GlobalForecaster(object):
             "normalized_lagged_values" in self.lag_df.columns
         ):  # I might change the name here to "transformed_lagged_values"
             # If we have rolling features
-            rolling_columns = [
-                col for col in self.lag_df.columns if "normalized_rolling" in col
-            ]
+            rolling_columns = [col for col in self.lag_df.columns if "normalized_rolling" in col]
             if len(rolling_columns) > 0:
                 # add them to feature list
                 for rolling_col in rolling_columns:
                     # add the elements on the lists of the rolling feature column
                     # to the list of the normalized lagged values elementwise
                     self.lag_df["normalized_lagged_values"] = self.lag_df.apply(
-                        lambda x: [
-                            a + b
-                            for a, b in zip(
-                                x["normalized_lagged_values"], x[rolling_col]
-                            )
-                        ],
+                        lambda x: [a + b for a, b in zip(x["normalized_lagged_values"], x[rolling_col])],
                         axis=1,
                     )
                 # Drop the rolling columns if memory gets large
@@ -99,9 +98,7 @@ class GlobalForecaster(object):
                     # add the elements on the lists of the rolling feature column
                     # to the list of the normalized lagged values elementwise
                     self.lag_df["lagged_values"] = self.lag_df.apply(
-                        lambda x: [
-                            a + b for a, b in zip(x["lagged_values"], x[rolling_col])
-                        ],
+                        lambda x: [a + b for a, b in zip(x["lagged_values"], x[rolling_col])],
                         axis=1,
                     )
                 # Drop the rolling columns
@@ -124,43 +121,13 @@ class GlobalForecaster(object):
         self.pred_df = self.create_cv_df(self.input_df, self.h, self.cv)
 
         # Forecasts
-        self.pred_df["forecasts"] = self.recurent_forecast(
-            self.model, self.pred_df, self.h
-        )
+        self.pred_df["forecasts"] = self.recurent_forecast(self.model, self.pred_df, self.h)
 
         # Unstack the dataframe and give the right format
         self.pred_df = self.unstack_dataframe(self.pred_df)
 
         # return
         return self.pred_df
-
-    def split_lag_targets(self, df):
-        """
-        Splits the lagged dataframe into targets and lagged values.
-
-        Args:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data.
-
-        Returns:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data with the targets and lagged values.
-
-        """
-
-        # dimension of targets: (windows, 1)
-        # dimension of lags: (windows, lags)
-
-        # targets are the last value for each window
-        df["targets"] = [
-            subwindows[:, -1].reshape(-1, 1) for subwindows in df["lag_windows"].values
-        ]
-        # lagged values are all values until the last one
-        df["lagged_values"] = [
-            subwindows[:, :-1] for subwindows in df["lag_windows"].values
-        ]
-
-        return df
 
     def build_rolling_features(self, df):
         # Initialize a df to include all rolling features
@@ -169,15 +136,11 @@ class GlobalForecaster(object):
         lags = self.features["lags"]
 
         # Itterate over the rolling features
-        for rolling_aggregation, rolling_windows in self.features[
-            "rolling_features"
-        ].items():
+        for rolling_aggregation, rolling_windows in self.features["rolling_features"].items():
             # Take the rolling lags
             rolling_lags = self.features["rolling_lags"][rolling_aggregation]
             # Construct the rolling features
-            temp_df = construct_single_rolling_feature(
-                df, rolling_aggregation, lags, rolling_windows, rolling_lags
-            )
+            temp_df = construct_single_rolling_feature(df, rolling_aggregation, lags, rolling_windows, rolling_lags)
             # Append to the main df
             rolling_df = pd.concat([rolling_df, temp_df], axis=1)
 
@@ -206,15 +169,11 @@ class GlobalForecaster(object):
 
         # Take the mean and the std of each subwindow
         df["mus"] = [
-            np.array([np.mean(subwindow) for subwindow in windows])
-            .reshape(-1, 1)
-            .tolist()
+            np.array([np.mean(subwindow) for subwindow in windows]).reshape(-1, 1).tolist()
             for windows in df["lagged_values"].values
         ]
         df["stds"] = [
-            np.array([np.std(subwindow) for subwindow in windows])
-            .reshape(-1, 1)
-            .tolist()
+            np.array([np.std(subwindow) for subwindow in windows]).reshape(-1, 1).tolist()
             for windows in df["lagged_values"].values
         ]
 
@@ -227,9 +186,7 @@ class GlobalForecaster(object):
                     for subwindow, mu, std in zip(windows, mus, stds)
                 ]
             ).tolist()
-            for windows, mus, stds in zip(
-                df["lagged_values"].values, df["mus"].values, df["stds"].values
-            )
+            for windows, mus, stds in zip(df["lagged_values"].values, df["mus"].values, df["stds"].values)
         ]
 
         # If we have rolling features
@@ -245,9 +202,7 @@ class GlobalForecaster(object):
                             for subwindow, mu, std in zip(windows, mus, stds)
                         ]
                     ).tolist()
-                    for windows, mus, stds in zip(
-                        df[rolling_col].values, df["mus"].values, df["stds"].values
-                    )
+                    for windows, mus, stds in zip(df[rolling_col].values, df["mus"].values, df["stds"].values)
                 ]
                 # drop the old rolling column
                 df = df.drop(columns=rolling_col)
@@ -255,16 +210,11 @@ class GlobalForecaster(object):
         if mode == "train":
             df["normalized_targets"] = [
                 np.array(
-                    [
-                        (target - mu) / std if std[0] > 0 else target - mu
-                        for target, mu, std in zip(targets, mus, stds)
-                    ]
+                    [(target - mu) / std if std[0] > 0 else target - mu for target, mu, std in zip(targets, mus, stds)]
                 )
                 .reshape(-1, 1)
                 .tolist()
-                for targets, mus, stds in zip(
-                    df["targets"].values, df["mus"].values, df["stds"].values
-                )
+                for targets, mus, stds in zip(df["targets"].values, df["mus"].values, df["stds"].values)
             ]
 
         else:
@@ -312,9 +262,7 @@ class GlobalForecaster(object):
             temp_df["cv"] = i + 1
 
             # Cut on the last_date and add the in-sample values for the train set in a list
-            temp_df["in_sample"] = df.iloc[
-                :, i : -total_test_length + i  # noqa: E203
-            ].values.tolist()
+            temp_df["in_sample"] = df.iloc[:, i : -total_test_length + i].values.tolist()  # noqa: E203
 
             # Repeat for the test set
             # if it is not the last cv
@@ -327,9 +275,7 @@ class GlobalForecaster(object):
                 temp_df["forecast_dates"] = (
                     np.tile(
                         dates[
-                            -total_test_length
-                            + i : -(total_test_length - h)  # noqa: E203
-                            + i  # noqa: E203
+                            -total_test_length + i : -(total_test_length - h) + i  # noqa: E203  # noqa: E203
                         ].tolist(),
                         df.shape[0],
                     )
@@ -340,21 +286,13 @@ class GlobalForecaster(object):
                 # just take the last h values here
                 temp_df["out_of_sample"] = df.iloc[:, -h:].values.tolist()
                 # add the forecast dates
-                temp_df["forecast_dates"] = (
-                    np.tile(dates[-h:].tolist(), df.shape[0])
-                    .reshape(df.shape[0], -1)
-                    .tolist()
-                )
+                temp_df["forecast_dates"] = np.tile(dates[-h:].tolist(), df.shape[0]).reshape(df.shape[0], -1).tolist()
 
             # Append the temp_df to the new_df
             out_df = pd.concat([out_df, temp_df])
 
         # Add the forecast horizons
-        out_df["horizon"] = (
-            np.tile(np.arange(1, h + 1), df.shape[0] * cv)
-            .reshape(df.shape[0] * cv, -1)
-            .tolist()
-        )
+        out_df["horizon"] = np.tile(np.arange(1, h + 1), df.shape[0] * cv).reshape(df.shape[0] * cv, -1).tolist()
 
         return out_df
 
@@ -380,9 +318,7 @@ class GlobalForecaster(object):
         # Rolling features
         if self.features["rolling_features"] is not None:
             # take the in-sample values
-            in_sample_df = pd.DataFrame(
-                pred_values["in_sample"].values.tolist(), index=pred_values.index
-            )
+            in_sample_df = pd.DataFrame(pred_values["in_sample"].values.tolist(), index=pred_values.index)
             # construct features
             rolling_df = self.build_rolling_features(in_sample_df, self.features)
             # for every rolling feature we need to take the last item of the list on each row
@@ -438,20 +374,13 @@ class GlobalForecaster(object):
             # take the values for forecasting
             if "normalized_lagged_values" in prediction_df.columns:
                 # If we have rolling features
-                rolling_columns = [
-                    col for col in prediction_df.columns if "normalized_rolling" in col
-                ]
+                rolling_columns = [col for col in prediction_df.columns if "normalized_rolling" in col]
                 if len(rolling_columns) > 0:
                     for rolling_col in rolling_columns:
                         # add the elements on the lists of the rolling feature column
                         # to the list of the normalized lagged values elementwise
                         prediction_df["normalized_lagged_values"] = prediction_df.apply(
-                            lambda x: [
-                                a + b
-                                for a, b in zip(
-                                    x["normalized_lagged_values"], x[rolling_col]
-                                )
-                            ],
+                            lambda x: [a + b for a, b in zip(x["normalized_lagged_values"], x[rolling_col])],
                             axis=1,
                         )
                     # Drop the rolling columns if memory gets large
@@ -461,24 +390,17 @@ class GlobalForecaster(object):
                 )  # will change that to transformed_lagged_values
             else:
                 # if we have rolling features
-                rolling_columns = [
-                    col for col in prediction_df.columns if "rolling" in col
-                ]
+                rolling_columns = [col for col in prediction_df.columns if "rolling" in col]
                 if len(rolling_columns) > 0:
                     for rolling_col in rolling_columns:
                         # add the elements on the lists of the rolling feature column
                         # to the list of the normalized lagged values elementwise
                         prediction_df["lagged_values"] = prediction_df.apply(
-                            lambda x: [
-                                a + b
-                                for a, b in zip(x["lagged_values"], x[rolling_col])
-                            ],
+                            lambda x: [a + b for a, b in zip(x["lagged_values"], x[rolling_col])],
                             axis=1,
                         )
                     # Drop the rolling columns
-                    prediction_df = prediction_df.drop(
-                        rolling_columns, axis=1, inplace=True
-                    )
+                    prediction_df = prediction_df.drop(rolling_columns, axis=1, inplace=True)
                 x_test = np.concatenate(prediction_df["lagged_values"].values)
 
             # Forecast
@@ -493,18 +415,13 @@ class GlobalForecaster(object):
                 # if we have standard scaler
                 if self.transformations["normalize"] == "StandardScaler":
                     # reverse normalization
-                    y_pred = (
-                        y_pred * prediction_df["stds"].values
-                        + prediction_df["mus"].values
-                    )
+                    y_pred = y_pred * prediction_df["stds"].values + prediction_df["mus"].values
 
             # append to the forecasts matrix
             forecasts[:, i] = y_pred
 
             # Append to the in_sample values as the last value
-            prediction_df["in_sample"] = [
-                x + [y] for x, y in zip(prediction_df["in_sample"].values, y_pred)
-            ]
+            prediction_df["in_sample"] = [x + [y] for x, y in zip(prediction_df["in_sample"].values, y_pred)]
 
         # return the forecasts
         return forecasts.tolist()

@@ -99,13 +99,9 @@ class MSTL:
         self._y = self._to_1d_array(endog)
         self.nobs = self._y.shape[0]
         self.lmbda = lmbda
-        self.periods, self.windows = self._process_periods_and_windows(
-            periods, windows
-        )
+        self.periods, self.windows = self._process_periods_and_windows(periods, windows)
         self.iterate = iterate
-        self._stl_kwargs = self._remove_overloaded_stl_kwargs(
-            stl_kwargs if stl_kwargs else {}
-        )
+        self._stl_kwargs = self._remove_overloaded_stl_kwargs(stl_kwargs if stl_kwargs else {})
 
     def fit(self):
         """
@@ -199,20 +195,13 @@ class MSTL:
 
         # Remove long periods from decomposition
         if any(period >= self.nobs / 2 for period in periods):
-            warnings.warn(
-                "A period(s) is larger than half the length of time series."
-                " Removing these period(s)."
-            )
-            periods = tuple(
-                period for period in periods if period < self.nobs / 2
-            )
+            warnings.warn("A period(s) is larger than half the length of time series." " Removing these period(s).")
+            periods = tuple(period for period in periods if period < self.nobs / 2)
             windows = windows[: len(periods)]
 
         return periods, windows
 
-    def _process_periods(
-        self, periods: Union[int, Sequence[int], None]
-    ) -> Sequence[int]:
+    def _process_periods(self, periods: Union[int, Sequence[int], None]) -> Sequence[int]:
         if periods is None:
             periods = (self._infer_period(),)
         elif isinstance(periods, int):
@@ -244,9 +233,7 @@ class MSTL:
         return period
 
     @staticmethod
-    def _sort_periods_and_windows(
-        periods, windows
-    ) -> Tuple[Sequence[int], Sequence[int]]:
+    def _sort_periods_and_windows(periods, windows) -> Tuple[Sequence[int], Sequence[int]]:
         if len(periods) != len(windows):
             raise ValueError("Periods and windows must have same length")
         periods, windows = zip(*sorted(zip(periods, windows)))
@@ -269,4 +256,3 @@ class MSTL:
         if y.ndim != 1:
             raise ValueError("y must be a 1d array")
         return y
-
