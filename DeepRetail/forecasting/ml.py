@@ -320,7 +320,7 @@ class GlobalForecaster(object):
             # take the in-sample values
             in_sample_df = pd.DataFrame(pred_values["in_sample"].values.tolist(), index=pred_values.index)
             # construct features
-            rolling_df = self.build_rolling_features(in_sample_df, self.features)
+            rolling_df = self.build_rolling_features(in_sample_df)
             # for every rolling feature we need to take the last item of the list on each row
             for col in rolling_df.columns:
                 rolling_df[col] = rolling_df[col].apply(lambda x: [x[-1]])
