@@ -627,7 +627,7 @@ class THieF(object):
             # convert it to a dictionary with the factors as keys
             self.resampled_dfs = {self.factors[i]: resampled_dfs[i] for i in range(len(self.factors))}
 
-    def predict(self, models, to_return=True, n_jobs=1, decompose=True):
+    def predict(self, models, to_return=True, n_jobs=1, decompose=False):
         """
         Generates base forecasts for each temporal level
 
@@ -658,7 +658,7 @@ class THieF(object):
         # Check if we have a model for each level
         if isinstance(models, str):
             # If not, use the same model for all levels
-            models = {i: models for i in self.factors}
+            models = {i: [models] for i in self.factors}
         # Check if we have enough models
         elif len(models) != len(self.factors):
             raise ValueError("The number of models should be equal to the number of factors")
