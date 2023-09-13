@@ -261,7 +261,7 @@ class C_THieF(object):
             self.factors = get_factors(get_numeric_frequency(self.bottom_level_freq))
         if isinstance(models, str):
             # If not, use the same model for all levels
-            models = {i: models for i in self.factors}
+            models = {i: [models] for i in self.factors}
         # Check if we have enough models
         elif len(models) != len(self.factors):
             raise ValueError("The number of models should be equal to the number of factors")

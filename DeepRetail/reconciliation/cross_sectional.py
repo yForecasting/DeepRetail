@@ -230,7 +230,7 @@ class CHieF(object):
             )
 
         else:
-            self.base_forecaster = StatisticalForecaster(models=models, freq=self.bottom_level_freq, n_jobs=n_jobs)
+            self.base_forecaster = StatisticalForecaster(models=[models], freq=self.bottom_level_freq, n_jobs=n_jobs)
 
         # Fit the forecaster
         self.base_forecaster.fit(self.cross_sectional_df, format="pivoted")
