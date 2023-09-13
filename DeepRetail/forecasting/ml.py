@@ -5,6 +5,7 @@ from DeepRetail.forecasting.utils import (
     create_lags,
     construct_single_rolling_feature,
     split_lag_targets,
+    standard_scaler_custom,
 )
 from DeepRetail.transformations.formats import pivoted_df
 
@@ -56,6 +57,9 @@ class GlobalForecaster(object):
         # drop the lag_windows
         self.lag_df = self.lag_df.drop("lag_windows", axis=1)
 
+        # Drop rows that have empty lists as lagged windows
+        self.lag_df[self.lag_df["lagged_values"].apply(lambda x: len(x) > 0)]
+
         # Create the rolling features
         if self.features["rolling_features"] is not None:
             rolling_df = self.build_rolling_features(self.fit_df)
@@ -67,7 +71,7 @@ class GlobalForecaster(object):
         if self.transformations["normalize"] is not None:
             if self.transformations["normalize"] == "StandardScaler":
                 # currently we only support standrad scaler
-                self.lag_df = self.standard_scaler_custom(self.lag_df)
+                self.lag_df = standard_scaler_custom(self.lag_df)
 
         # Next we concat all features into the x_train and y_train arrays
         if (
@@ -147,82 +151,6 @@ class GlobalForecaster(object):
         # return
         # round the whole df
         return rolling_df
-
-    def standard_scaler_custom(self, df, mode="train"):
-        """
-        A custom standard scaler normalization method.
-        Normalized the lagged windows
-
-        Args:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data.
-            mode (str):
-                A string indicating the mode of the normalization.
-                If mode is 'train' then the normalization is performed on the lagged windows and the targets.
-                If mode is 'test' then the normalization is performed only on the lagged windows.
-
-        Returns:
-            df (pd.DataFrame):
-                A dataframe containing the lagged time series data with the normalized lagged windows and targets.
-
-        """
-
-        # Take the mean and the std of each subwindow
-        df["mus"] = [
-            np.array([np.mean(subwindow) for subwindow in windows]).reshape(-1, 1).tolist()
-            for windows in df["lagged_values"].values
-        ]
-        df["stds"] = [
-            np.array([np.std(subwindow) for subwindow in windows]).reshape(-1, 1).tolist()
-            for windows in df["lagged_values"].values
-        ]
-
-        # Normalize the lagged values by substracting the mean and dividing with the std of every window.
-        # If std is zero or nan skip the division.
-        df["normalized_lagged_values"] = [
-            np.array(
-                [
-                    (subwindow - mu) / std if std[0] > 0 else subwindow - mu
-                    for subwindow, mu, std in zip(windows, mus, stds)
-                ]
-            ).tolist()
-            for windows, mus, stds in zip(df["lagged_values"].values, df["mus"].values, df["stds"].values)
-        ]
-
-        # If we have rolling features
-        rolling_columns = [col for col in df.columns if "rolling" in col]
-        if len(rolling_columns) > 0:
-            # Normalize these as well
-            for rolling_col in rolling_columns:
-                new_rolling_col = "normalized_" + rolling_col
-                df[new_rolling_col] = [
-                    np.array(
-                        [
-                            (subwindow - mu) / std if std[0] > 0 else subwindow - mu
-                            for subwindow, mu, std in zip(windows, mus, stds)
-                        ]
-                    ).tolist()
-                    for windows, mus, stds in zip(df[rolling_col].values, df["mus"].values, df["stds"].values)
-                ]
-                # drop the old rolling column
-                df = df.drop(columns=rolling_col)
-        # Normalize the targets in the same way
-        if mode == "train":
-            df["normalized_targets"] = [
-                np.array(
-                    [(target - mu) / std if std[0] > 0 else target - mu for target, mu, std in zip(targets, mus, stds)]
-                )
-                .reshape(-1, 1)
-                .tolist()
-                for targets, mus, stds in zip(df["targets"].values, df["mus"].values, df["stds"].values)
-            ]
-
-        else:
-            # Squezze the mus and stds columns
-            df["mus"] = df["mus"].apply(lambda x: x[0][0])
-            df["stds"] = df["stds"].apply(lambda x: x[0][0])
-
-        return df
 
     def create_cv_df(self, df, h, cv):
         """
@@ -330,7 +258,7 @@ class GlobalForecaster(object):
         if self.transformations["normalize"] is not None:
             # currently I only have standard scaler
             if self.transformations["normalize"] == "StandardScaler":
-                pred_values = self.standard_scaler_custom(pred_values, mode="test")
+                pred_values = standard_scaler_custom(pred_values, mode="test")
 
         return pred_values
 
