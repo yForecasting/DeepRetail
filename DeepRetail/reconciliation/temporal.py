@@ -360,7 +360,13 @@ class TemporalReconciler(object):
                 # Filter on the fold
                 self.base_fc_df = self.original_df[self.original_df["cv"] == k + 1]
                 self.reconciliation_ready_df = self.reconciled_df_list[k]
-                temp_residual_df = residual_df[residual_df["cv"] == k + 1]
+
+                # If we dont have struc reconciliation we need to get the residuals
+                if method != "struc":
+                    # Get residuals
+                    temp_residual_df = residual_df[residual_df["cv"] == k + 1]
+                else:
+                    temp_residual_df = None
 
                 # Get the Weight matrix
                 self.Wmat = self.compute_matrix_W(method, residual_df=temp_residual_df)
