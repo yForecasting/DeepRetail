@@ -310,11 +310,11 @@ def read_case_4(read_filepath):
 
     # Editting the items names
     # Convert to str and titlecase
-    df.loc[:, "Modellen van interesse"] = df["Modellen van interesse"].astype(str).str.title()
+    df["Modellen van interesse"] = df["Modellen van interesse"].astype(str).str.title()
     df["Merk"] = df["Merk"].astype(str).str.title()
 
     # Keep only the last item shown in case it is of the right brand
-    df.loc[:, "Modellen van interesse"] = [
+    df["Modellen van interesse"] = [
         [i for i in a.split(",") if str(b) in i] for a, b in zip(df["Modellen van interesse"], df["Merk"])
     ]
     df.loc[:, "Keep"] = [len(a) for a in df["Modellen van interesse"].values]
@@ -326,12 +326,12 @@ def read_case_4(read_filepath):
     df = df[df["Keep"] > 1]
 
     # Fix issues with some items
-    df.loc[:, "Modellen van interesse"] = [
+    df["Modellen van interesse"] = [
         " ".join(a.split(" ")[1:]) if a.split(" ")[1] == "Audi" else a for a in df["Modellen van interesse"].values
     ]
 
     # fix the issue with RS 6 and RS6, merge characters if a number is after a letter
-    df.loc[:, "Modellen van interesse"] = [
+    df["Modellen van interesse"] = [
         " ".join(
             [
                 "".join([a.split(" ")[i], a.split(" ")[i + 1]]) if a.split(" ")[i + 1].isdigit() else a.split(" ")[i]
