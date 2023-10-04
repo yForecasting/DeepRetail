@@ -55,9 +55,7 @@ def read_case_0(read_filepath, calendar_filepath):
     return df
 
 
-def read_case_1(
-    read_filepath, products_filepath, write_filepath, frequency, temporary_save
-):
+def read_case_1(read_filepath, products_filepath, write_filepath, frequency, temporary_save):
     """Reads data for case 1
 
     Args:
@@ -112,9 +110,7 @@ def read_case_1(
     elif frequency == "M":
         chunk_size = 59
     else:
-        raise ValueError(
-            "Currently supporting only Weekly(W) and Monthly(M) frequencies for case 1"
-        )
+        raise ValueError("Currently supporting only Weekly(W) and Monthly(M) frequencies for case 1")
     # Initialize values for the chunks
     start_date = df["date"].min()
     chunk_period = datetime.timedelta(days=chunk_size)
@@ -126,18 +122,13 @@ def read_case_1(
 
     # Initialize the names on the unique_id
     # Lower level is the product-level
-    out_df["unique_id"] = [
-        "-".join([d, s, i])
-        for d, s, i in zip(out_df["DC"], out_df["Shop"], out_df["Item"])
-    ]
+    out_df["unique_id"] = ["-".join([d, s, i]) for d, s, i in zip(out_df["DC"], out_df["Shop"], out_df["Item"])]
     out_df = out_df.drop(["DC", "Shop", "Item"], axis=1)
     # out_df = out_df.rename(columns={"Item": "unique_id"})
 
     # Pivot and resample to the given frequency
     out_df = (
-        pd.pivot_table(
-            out_df, index="unique_id", columns="date", values="y", aggfunc="sum"
-        )
+        pd.pivot_table(out_df, index="unique_id", columns="date", values="y", aggfunc="sum")
         .resample(frequency, axis=1)
         .sum()
     )
@@ -151,17 +142,12 @@ def read_case_1(
         start_date = temp_date - datetime.timedelta(days=1)
 
         # Update names on the unique_id, drop columns, pivot & resample
-        temp_df["unique_id"] = [
-            "-".join([d, s, i])
-            for d, s, i in zip(temp_df["DC"], temp_df["Shop"], temp_df["Item"])
-        ]
+        temp_df["unique_id"] = ["-".join([d, s, i]) for d, s, i in zip(temp_df["DC"], temp_df["Shop"], temp_df["Item"])]
         temp_df = temp_df.drop(["DC", "Shop", "Item"], axis=1)
         # temp_df = temp_df.rename(columns={"Item": "unique_id"})
 
         temp_df = (
-            pd.pivot_table(
-                temp_df, index="unique_id", columns="date", values="y", aggfunc="sum"
-            )
+            pd.pivot_table(temp_df, index="unique_id", columns="date", values="y", aggfunc="sum")
             .resample(frequency, axis=1)
             .sum()
         )
@@ -194,22 +180,14 @@ def read_case_1(
     df_products = prepare_product_data(metadata, out_df)
 
     # Add a unique numeric code for each product family
-    df_products["product_family_code"] = (
-        df_products["ProductFamily"].astype("category").cat.codes
-    )
+    df_products["product_family_code"] = df_products["ProductFamily"].astype("category").cat.codes
 
     # Add the hierarchical information here
     # add the product_family_code to the df
-    out_df = pd.merge(
-        out_df, df_products[["product_family_code", "unique_id"]], on="unique_id"
-    )
+    out_df = pd.merge(out_df, df_products[["product_family_code", "unique_id"]], on="unique_id")
 
     # Add the new unique_id
-    out_df["unique_id"] = (
-        out_df["product_family_code"].astype(str)
-        + "_"
-        + out_df["unique_id"].astype(str)
-    )
+    out_df["unique_id"] = out_df["product_family_code"].astype(str) + "_" + out_df["unique_id"].astype(str)
 
     # drop the product_family_code and the Item columns
     out_df = out_df.drop(["product_family_code"], axis=1)
@@ -229,9 +207,7 @@ def read_case_2(read_filepath):
 
     # Read data from an excel format
     xl = pd.ExcelFile(read_filepath)
-    df = pd.read_excel(
-        xl, "data"
-    )  # data is the name of the tab with the time series data
+    df = pd.read_excel(xl, "data")  # data is the name of the tab with the time series data
 
     # Rename columns
     df = df.rename(
@@ -257,9 +233,7 @@ def read_case_2(read_filepath):
     df["ID"] = items_num
     # Replace delimiters
     df["y"] = [
-        float(val.replace(",", "."))
-        if type(val) == str
-        else float(str(val).replace(",", "."))
+        float(val.replace(",", ".")) if type(val) == str else float(str(val).replace(",", "."))
         for val in df["y"].values
     ]
     # Convert to datetime
@@ -267,10 +241,7 @@ def read_case_2(read_filepath):
 
     # prepare the unique_id col
     # Format: Product Family + ID
-    df["unique_id"] = [
-        "-".join([product, str(id)])
-        for product, id in zip(df["ProductFamily"], df["ID"])
-    ]
+    df["unique_id"] = ["-".join([product, str(id)]) for product, id in zip(df["ProductFamily"], df["ID"])]
 
     # keeping only specific columns
     cols_to_keep = ["date", "y", "unique_id"]
@@ -310,9 +281,7 @@ def read_case_3(
 
     # Merge on the names to make the unique_id
     # format: Shop - group
-    df["unique_id"] = [
-        str(shop) + "-" + str(group) for shop, group in zip(df["Resource"], df["Groep"])
-    ]
+    df["unique_id"] = [str(shop) + "-" + str(group) for shop, group in zip(df["Resource"], df["Groep"])]
 
     # Drop cols
     df = df.drop(["Groep", "Resource"], axis=1)
@@ -341,39 +310,31 @@ def read_case_4(read_filepath):
 
     # Editting the items names
     # Convert to str and titlecase
-    df.loc[:, "Modellen van interesse"] = (
-        df["Modellen van interesse"].astype(str).str.title()
-    )
+    df["Modellen van interesse"] = df["Modellen van interesse"].astype(str).str.title()
     df["Merk"] = df["Merk"].astype(str).str.title()
 
     # Keep only the last item shown in case it is of the right brand
-    df.loc[:, "Modellen van interesse"] = [
-        [i for i in a.split(",") if str(b) in i]
-        for a, b in zip(df["Modellen van interesse"], df["Merk"])
+    df["Modellen van interesse"] = [
+        [i for i in a.split(",") if str(b) in i] for a, b in zip(df["Modellen van interesse"], df["Merk"])
     ]
     df.loc[:, "Keep"] = [len(a) for a in df["Modellen van interesse"].values]
     df = df[df["Keep"] > 0]
-    df["Modellen van interesse"] = [
-        item[0] for item in df["Modellen van interesse"].values
-    ]
+    df["Modellen van interesse"] = [item[0] for item in df["Modellen van interesse"].values]
 
     # Remove brands without naming
     df.loc[:, "Keep"] = [len(a.split(" ")) for a in df["Modellen van interesse"].values]
     df = df[df["Keep"] > 1]
 
     # Fix issues with some items
-    df.loc[:, "Modellen van interesse"] = [
-        " ".join(a.split(" ")[1:]) if a.split(" ")[1] == "Audi" else a
-        for a in df["Modellen van interesse"].values
+    df["Modellen van interesse"] = [
+        " ".join(a.split(" ")[1:]) if a.split(" ")[1] == "Audi" else a for a in df["Modellen van interesse"].values
     ]
 
     # fix the issue with RS 6 and RS6, merge characters if a number is after a letter
-    df.loc[:, "Modellen van interesse"] = [
+    df["Modellen van interesse"] = [
         " ".join(
             [
-                "".join([a.split(" ")[i], a.split(" ")[i + 1]])
-                if a.split(" ")[i + 1].isdigit()
-                else a.split(" ")[i]
+                "".join([a.split(" ")[i], a.split(" ")[i + 1]]) if a.split(" ")[i + 1].isdigit() else a.split(" ")[i]
                 for i in range(len(a.split(" ")) - 1)
             ]
             + [a.split(" ")[-1]]
@@ -382,20 +343,12 @@ def read_case_4(read_filepath):
     ]
 
     # Manualy replace some values for a car
-    df.loc[:, "Modellen van interesse"] = df.loc[
-        :, "Modellen van interesse"
-    ].str.replace("!", " ")
-    df.loc[:, "Modellen van interesse"] = df.loc[
-        :, "Modellen van interesse"
-    ].str.replace("Multivan77", "Multivan")
-    df.loc[:, "Modellen van interesse"] = df.loc[
-        :, "Modellen van interesse"
-    ].str.replace("Multivan7", "Multivan")
+    df.loc[:, "Modellen van interesse"] = df.loc[:, "Modellen van interesse"].str.replace("!", " ")
+    df.loc[:, "Modellen van interesse"] = df.loc[:, "Modellen van interesse"].str.replace("Multivan77", "Multivan")
+    df.loc[:, "Modellen van interesse"] = df.loc[:, "Modellen van interesse"].str.replace("Multivan7", "Multivan")
 
     # keep onl standard models not extras
-    df.loc[:, "Modellen van interesse"] = [
-        " ".join(a.split(" ")[:2]) for a in df["Modellen van interesse"].values
-    ]
+    df.loc[:, "Modellen van interesse"] = [" ".join(a.split(" ")[:2]) for a in df["Modellen van interesse"].values]
 
     # Add the sale
     df.loc[:, "Sale"] = 1
@@ -458,9 +411,7 @@ def prepare_product_data(metadata, df):
 
     # Keep only relevant items
     product_family["unique_id"] = product_family["unique_id"].astype(int)
-    product_family = product_family[
-        product_family["unique_id"].isin(df["unique_id"].unique())
-    ]
+    product_family = product_family[product_family["unique_id"].isin(df["unique_id"].unique())]
 
     return product_family
 
@@ -482,12 +433,8 @@ def read_case_5(read_filepath):
     gc.collect()
 
     # Fix the dates on order/invoice
-    df["ORDER_DATE"] = pd.to_datetime(
-        [item.split(" ")[0] for item in df["ORDER_DATE"].values]
-    )
-    df["INVOICE_DATE"] = pd.to_datetime(
-        [item.split(" ")[0] for item in df["INVOICE_DATE"].values]
-    )
+    df["ORDER_DATE"] = pd.to_datetime([item.split(" ")[0] for item in df["ORDER_DATE"].values])
+    df["INVOICE_DATE"] = pd.to_datetime([item.split(" ")[0] for item in df["INVOICE_DATE"].values])
 
     # Following steps clean data
     # For detailed explanations head to the case specific read notebook
@@ -496,9 +443,7 @@ def read_case_5(read_filepath):
     df = df[~df["PRODUCT_CODE"].str.startswith("D")]
 
     # remove some promotion items based on a flag
-    df["gift"] = df.apply(
-        lambda row: remove_gifts(row["EUR_INVOICED"], row["QTY_INVOICED"]), axis=1
-    )
+    df["gift"] = df.apply(lambda row: remove_gifts(row["EUR_INVOICED"], row["QTY_INVOICED"]), axis=1)
     df = df[df["gift"] == 0]
     df = df.drop("gift", axis=1)
 
@@ -532,11 +477,7 @@ def read_case_5(read_filepath):
 
     # Repeat
     to_group = ["ORDER_LINE", "PRODUCT_CODE", "SHIPTO_CODE", "FullOrder"]
-    df = (
-        df.groupby(to_group)
-        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "last"})
-        .reset_index()
-    )
+    df = df.groupby(to_group).agg({"QTY_INVOICED": "sum", "ORDER_DATE": "last"}).reset_index()
 
     # Group again
     to_group = ["PRODUCT_CODE", "SHIPTO_CODE", "FullOrder", "ORDER_DATE"]
@@ -544,19 +485,11 @@ def read_case_5(read_filepath):
 
     # Group again
     to_group = ["PRODUCT_CODE", "SHIPTO_CODE", "FullOrder"]
-    df = (
-        df.groupby(to_group)
-        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first"})
-        .reset_index()
-    )
+    df = df.groupby(to_group).agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first"}).reset_index()
 
     # Group again
     to_group = ["PRODUCT_CODE", "FullOrder"]
-    df = (
-        df.groupby(to_group)
-        .agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first", "SHIPTO_CODE": "first"})
-        .reset_index()
-    )
+    df = df.groupby(to_group).agg({"QTY_INVOICED": "sum", "ORDER_DATE": "first", "SHIPTO_CODE": "first"}).reset_index()
 
     # After making the corrections droping some extra negative values
     df = df[df["QTY_INVOICED"] > 0]
@@ -617,9 +550,7 @@ def read_case_5(read_filepath):
     df["product_id"] = [id.split("-")[0] for id in df["PRODUCT_CODE"]]
 
     # Add the family:
-    df["product_id"] = [
-        str(fam) + "_" + str(id) for fam, id in zip(df["FAM"], df["product_id"])
-    ]
+    df["product_id"] = [str(fam) + "_" + str(id) for fam, id in zip(df["FAM"], df["product_id"])]
 
     df = df.groupby(["product_id", "ORDER_DATE"]).agg({"Sales": "sum"}).reset_index()
 
