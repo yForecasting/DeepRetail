@@ -34,9 +34,7 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
     df["date"] = pd.to_datetime(df["date"])
 
     # Pivots on the original frequency
-    pivot_df = pd.pivot_table(
-        df, index="unique_id", columns="date", values="y", aggfunc="first"
-    )
+    pivot_df = pd.pivot_table(df, index="unique_id", columns="date", values="y", aggfunc="first")
 
     # Drop values with full nans
     pivot_df = pivot_df.dropna(axis=0, how="all")
@@ -166,17 +164,13 @@ def statsforecast_forecast_format(df, format="transaction"):
         # and rename the date column to ds
         df = df.rename(columns={"date": "ds"})
     else:
-        raise ValueError(
-            "Provide the dataframe either in pivoted or transactional format."
-        )
+        raise ValueError("Provide the dataframe either in pivoted or transactional format.")
 
     # Return
     return df
 
 
-def extract_hierarchical_structure(
-    df, current_format, correct_format, splitter, add_total=True, format="transaction"
-):
+def extract_hierarchical_structure(df, current_format, correct_format, splitter, add_total=True, format="transaction"):
     """
     Extract the hierarchical structure from the unique id of a dataframe.
     Returns a new dataframe with the hierarchical structure as columns.
@@ -240,9 +234,7 @@ def extract_hierarchical_structure(
     df = df.set_index("unique_id")
 
     # Create a new column for every item on the list of the temp column
-    df = df.join(pd.DataFrame(df["temp"].tolist(), index=df.index)).drop(
-        columns=["temp"]
-    )
+    df = df.join(pd.DataFrame(df["temp"].tolist(), index=df.index)).drop(columns=["temp"])
 
     # Rename the columns based on the current format
     df.columns = current_format
@@ -345,9 +337,7 @@ def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
 
     # create a categorical data type with the true order
     # Used for sorting the dataframe
-    cat_dtype = pd.api.types.CategoricalDtype(
-        categories=h_format.columns.values, ordered=True
-    )
+    cat_dtype = pd.api.types.CategoricalDtype(categories=h_format.columns.values, ordered=True)
 
     # Prepare the hierarchical format
     # Collapse the hierarchical format
@@ -360,9 +350,7 @@ def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
     h_format = h_format.drop_duplicates(subset=[0])
 
     # rename
-    h_format = h_format.rename(
-        columns={"level_1": "cross_sectional_level", 0: "unique_id"}
-    )
+    h_format = h_format.rename(columns={"level_1": "cross_sectional_level", 0: "unique_id"})
 
     # Prepare the original df
     df = transaction_df(df) if format == "pivoted" else df
