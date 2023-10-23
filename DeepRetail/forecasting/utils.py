@@ -176,7 +176,7 @@ def window(a, window_size):
     view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[0::1]  # The step size is 1, i.e. no overlapping
 
     # Discard windows with all zeros
-    view = view[~np.all(view == 0, axis=1)]
+    # view = view[~np.all(view == 0, axis=1)]
 
     return view
 
