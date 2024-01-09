@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 
-from DeepRetail.transformations.formats import get_reminder, StandardScaler_custom, transaction_df, MinMaxScaler_custom
+from DeepRetail.transformations.formats import (
+    get_reminder,
+    StandardScaler_custom,
+    transaction_df,
+    MinMaxScaler_custom,
+)
 from tsfeatures import tsfeatures, stl_features, entropy, lumpiness
 from statsmodels.tsa.stattools import pacf, acf
 
@@ -33,6 +38,7 @@ def visualize_series(
     month=True,
     quarter=True,
     annual=True,
+    holiday_df=None,  # New parameter
 ):
     """Plots the given amount of time series.
 
@@ -51,6 +57,8 @@ def visualize_series(
                                 Defaults to True
         annual (bool, optional): If to include annualy moving average time series.
                                 Defaults to True
+        holiday_df (pd.DataFrame, optional): The dataframe with the holidays. Columns: Date, Holiday.
+
     """
 
     # Extract variables
@@ -62,6 +70,12 @@ def visualize_series(
     gray_scale = 0.9
     row_to_vis = 3
     total_to_vis = n - n % row_to_vis  # total number should be divided by 3
+
+    # Convert the 'Date' column to datetime if it's not already
+    holiday_df["date"] = pd.to_datetime(holiday_df["date"])
+
+    # Extract the dates that are marked as holidays/special days
+    special_days = holiday_df[holiday_df["holiday"] == "Holiday"]["date"]
 
     for idx in range(0, total_to_vis, row_to_vis):
         plt.figure(figsize=(20, 15))
@@ -76,7 +90,9 @@ def visualize_series(
                 ma_monthly = moving_average(y, 4)
                 ma_monthly = np.pad(ma_monthly, pad_width=(3, 0), constant_values=None)
                 ma_quarterly = moving_average(y, 13)
-                ma_quarterly = np.pad(ma_quarterly, pad_width=(12, 0), constant_values=None)
+                ma_quarterly = np.pad(
+                    ma_quarterly, pad_width=(12, 0), constant_values=None
+                )
                 ma_annualy = moving_average(y, 52)
                 ma_annualy = np.pad(ma_annualy, pad_width=(51, 0), constant_values=None)
 
@@ -95,11 +111,34 @@ def visualize_series(
                 plt.plot(dates[s2mask], ma_quarterly[s2mask], label="Quarterly Average")
             if annual:
                 plt.plot(dates[s3mask], ma_annualy[s3mask], label="Annualy Average")
+
+            if holiday_df is not None:
+                # Find indices of the special days in the 'dates' array
+                special_indices = [
+                    i for i, date in enumerate(dates) if date in special_days.values
+                ]
+
+                # Plot markers at the bottom of the chart for special days
+                for special_idx in special_indices:
+                    plt.plot(
+                        dates[special_idx],
+                        min(y),
+                        "r^",
+                        markersize=2,
+                        label="Special Day" if idx == 0 and i == 0 else "",
+                    )
+
             plt.xticks(rotation=45)
             plt.grid()
             plt.legend()
 
             ax.set_facecolor((gray_scale, gray_scale, gray_scale))
+
+            # Make sure the legend only shows one instance of each label
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
+
         plt.gcf().tight_layout()
         plt.show()
 
@@ -173,7 +212,9 @@ def get_features(df, seasonal_period, periods):
 
     # Estimate the features
 
-    features = tsfeatures(t_df, freq=seasonal_period, features=[stl_features, entropy, lumpiness])
+    features = tsfeatures(
+        t_df, freq=seasonal_period, features=[stl_features, entropy, lumpiness]
+    )
     # Estimate CV here
     features["Residual_CoV"] = Residual_CoV(df, periods).squeeze()
 
@@ -314,7 +355,9 @@ def scatter_hist(df, ax, ax_histx, ax_histy, fig, ax_cor):
 
     # Picks the number of bins automaticaly!
     ax_histx.hist(x, bins=np.histogram_bin_edges(x, bins="auto"))
-    ax_histy.hist(y, bins=np.histogram_bin_edges(y, bins="auto"), orientation="horizontal")
+    ax_histy.hist(
+        y, bins=np.histogram_bin_edges(y, bins="auto"), orientation="horizontal"
+    )
 
     clb = fig.colorbar(im, cax=ax_cor)
     clb.ax.set_title("Volume")
@@ -386,10 +429,16 @@ def plot_level_volume_variance(df, level_threshold=None):
 
     # Estimate non-zero level
     df_non_zero = df[df["y"] != 0]
-    level_df = df_non_zero.groupby("unique_id").agg({"y": np.mean}).rename(columns={"y": "Level"})
+    level_df = (
+        df_non_zero.groupby("unique_id")
+        .agg({"y": np.mean})
+        .rename(columns={"y": "Level"})
+    )
 
     # Merge
-    df_group = pd.merge(level_df, df_group, left_index=True, right_index=True, how="inner")
+    df_group = pd.merge(
+        level_df, df_group, left_index=True, right_index=True, how="inner"
+    )
 
     # Filter on the threshold
     if level_threshold is not None:
@@ -541,7 +590,9 @@ def visualize_pacf(pivoted_df, n, lags, alpha, method="ywm"):
 
             lags_x[0] -= 0.5
             lags_x[-1] += 0.5
-            ax.fill_between(lags_x, confint[:, 0] - pacf_x, confint[:, 1] - pacf_x, alpha=0.25)
+            ax.fill_between(
+                lags_x, confint[:, 0] - pacf_x, confint[:, 1] - pacf_x, alpha=0.25
+            )
 
             gray_scale = 0.93
             ax.set_facecolor((gray_scale, gray_scale, gray_scale))
@@ -619,7 +670,9 @@ def visualize_acf(
 
             lags_x[0] -= 0.5
             lags_x[-1] += 0.5
-            ax.fill_between(lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25)
+            ax.fill_between(
+                lags_x, confint[:, 0] - acf_x, confint[:, 1] - acf_x, alpha=0.25
+            )
 
             gray_scale = 0.93
             ax.set_facecolor((gray_scale, gray_scale, gray_scale))
@@ -737,7 +790,9 @@ def plot_seasonal_boxplot(df, x_axis, hue, ax):
         ax (matplotlib.axes._subplots.AxesSubplot): The axis to plot on
     """
     # Plot
-    sns.boxplot(data=df.dropna(), x=x_axis, y="y", hue=hue, ax=ax, showfliers=False, linewidth=1)
+    sns.boxplot(
+        data=df.dropna(), x=x_axis, y="y", hue=hue, ax=ax, showfliers=False, linewidth=1
+    )
 
     # Edit format
     title = f"Seasonal Boxplot: {x_axis} by {hue} average"
@@ -824,7 +879,9 @@ def calendar_heatmap(df, format, by):
         temp_df = create_features(temp_df, format=format)
 
         # Pivot
-        temp_df = pd.pivot_table(temp_df, index=x_axis, values="y", columns=y_axis, aggfunc="mean")
+        temp_df = pd.pivot_table(
+            temp_df, index=x_axis, values="y", columns=y_axis, aggfunc="mean"
+        )
 
         # Add the plot
         sns.heatmap(
