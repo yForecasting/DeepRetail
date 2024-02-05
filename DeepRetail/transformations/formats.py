@@ -34,7 +34,9 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
     df["date"] = pd.to_datetime(df["date"])
 
     # Pivots on the original frequency
-    pivot_df = pd.pivot_table(df, index="unique_id", columns="date", values="y", aggfunc="first")
+    pivot_df = pd.pivot_table(
+        df, index="unique_id", columns="date", values="y", aggfunc="first"
+    )
 
     # Drop values with full nans
     pivot_df = pivot_df.dropna(axis=0, how="all")
@@ -137,7 +139,9 @@ def sktime_forecast_format(df, format="transaction"):
     return df
 
 
-def statsforecast_forecast_format(df, format="transaction"):
+def statsforecast_forecast_format(
+    df, format="transaction", fill_missing=False, fill_value="nan"
+):
     """
     Converts a dataframe to the format required for forecasting with statsforecast.
 
@@ -146,6 +150,11 @@ def statsforecast_forecast_format(df, format="transaction"):
             The input data.
         format : str, default='transaction'
             The format of the input data. Can be 'transaction' or 'pivotted'.
+        fill_missing : bool, default=False
+            Whether to fill missing dates with NaN values. If True, the 'fill_value' argument
+            must be specified.
+        fill_value : str, int, float, default='nan'
+            The value to use for filling missing dates. Default is 'nan'.
 
     Returns:
         df : pd.DataFrame
@@ -157,6 +166,11 @@ def statsforecast_forecast_format(df, format="transaction"):
     if format == "transaction":
         # just rename the date column to ds
         df = df.rename(columns={"date": "ds"})
+
+        # fill missing dates if specified
+        if fill_missing:
+            df = fill_missing_dates(df, fill_value=fill_value)
+
     elif format == "pivotted":
         # if we have pivotted
         # we need to convert it to transaction
@@ -164,13 +178,57 @@ def statsforecast_forecast_format(df, format="transaction"):
         # and rename the date column to ds
         df = df.rename(columns={"date": "ds"})
     else:
-        raise ValueError("Provide the dataframe either in pivoted or transactional format.")
+        raise ValueError(
+            "Provide the dataframe either in pivoted or transactional format."
+        )
 
     # Return
     return df
 
 
-def extract_hierarchical_structure(df, current_format, correct_format, splitter, add_total=True, format="transaction"):
+def fill_missing_dates(df, fill_value="nan"):
+    """
+    Fills missing dates due to no sales.
+
+    Args:
+        df : pd.DataFrame
+            The input data, expected to have at least 'ds' (date), 'y' (target variable),
+            and 'unique_id' columns.
+        fill_value: str, int
+            The value to use for filling missing dates. Default is 'nan'.
+
+    Returns:
+        df : pd.DataFrame
+            The formatted DataFrame with a continuous date range for each 'unique_id',
+            filling missing dates with NaN values for 'y', and ensuring that the 'ds' column is
+            of datetime type. The returned DataFrame is sorted by 'unique_id' and 'ds'.
+    """
+
+    # Identify the full date range in the dataset
+    min_date, max_date = df["ds"].min(), df["ds"].max()
+    all_dates = pd.date_range(start=min_date, end=max_date, freq="D")
+
+    # Create a MultiIndex with all combinations of 'unique_id' and 'all_dates'
+    unique_ids = df["unique_id"].unique()
+    multi_index = pd.MultiIndex.from_product(
+        [unique_ids, all_dates], names=["unique_id", "ds"]
+    )
+
+    # Reindex the DataFrame to include missing dates
+    df_reindexed = df.set_index(["unique_id", "ds"]).reindex(multi_index).reset_index()
+
+    # Sort by 'unique_id' and 'ds'
+    df_reindexed = df_reindexed.sort_values(by=["unique_id", "ds"])
+
+    if fill_value != "nan":
+        df_reindexed = df_reindexed.fillna(fill_value)
+
+    return df_reindexed
+
+
+def extract_hierarchical_structure(
+    df, current_format, correct_format, splitter, add_total=True, format="transaction"
+):
     """
     Extract the hierarchical structure from the unique id of a dataframe.
     Returns a new dataframe with the hierarchical structure as columns.
@@ -234,7 +292,9 @@ def extract_hierarchical_structure(df, current_format, correct_format, splitter,
     df = df.set_index("unique_id")
 
     # Create a new column for every item on the list of the temp column
-    df = df.join(pd.DataFrame(df["temp"].tolist(), index=df.index)).drop(columns=["temp"])
+    df = df.join(pd.DataFrame(df["temp"].tolist(), index=df.index)).drop(
+        columns=["temp"]
+    )
 
     # Rename the columns based on the current format
     df.columns = current_format
@@ -337,7 +397,9 @@ def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
 
     # create a categorical data type with the true order
     # Used for sorting the dataframe
-    cat_dtype = pd.api.types.CategoricalDtype(categories=h_format.columns.values, ordered=True)
+    cat_dtype = pd.api.types.CategoricalDtype(
+        categories=h_format.columns.values, ordered=True
+    )
 
     # Prepare the hierarchical format
     # Collapse the hierarchical format
@@ -350,7 +412,9 @@ def hierarchical_to_transaction(df, h_format, sort_by=True, format="pivoted"):
     h_format = h_format.drop_duplicates(subset=[0])
 
     # rename
-    h_format = h_format.rename(columns={"level_1": "cross_sectional_level", 0: "unique_id"})
+    h_format = h_format.rename(
+        columns={"level_1": "cross_sectional_level", 0: "unique_id"}
+    )
 
     # Prepare the original df
     df = transaction_df(df) if format == "pivoted" else df
