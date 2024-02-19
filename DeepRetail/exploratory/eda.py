@@ -71,12 +71,6 @@ def visualize_series(
     row_to_vis = 3
     total_to_vis = n - n % row_to_vis  # total number should be divided by 3
 
-    # Convert the 'Date' column to datetime if it's not already
-    holiday_df["date"] = pd.to_datetime(holiday_df["date"])
-
-    # Extract the dates that are marked as holidays/special days
-    special_days = holiday_df[holiday_df["holiday"] == "Holiday"]["date"]
-
     for idx in range(0, total_to_vis, row_to_vis):
         plt.figure(figsize=(20, 15))
         for i in range(0, row_to_vis):
@@ -113,6 +107,12 @@ def visualize_series(
                 plt.plot(dates[s3mask], ma_annualy[s3mask], label="Annualy Average")
 
             if holiday_df is not None:
+                # Convert the 'Date' column to datetime if it's not already
+                holiday_df["date"] = pd.to_datetime(holiday_df["date"])
+
+                # Extract the dates that are marked as holidays/special days
+                special_days = holiday_df[holiday_df["holiday"] == "Holiday"]["date"]
+
                 # Find indices of the special days in the 'dates' array
                 special_indices = [
                     i for i, date in enumerate(dates) if date in special_days.values
