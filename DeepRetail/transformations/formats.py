@@ -2,7 +2,7 @@ import pandas as pd
 from DeepRetail.transformations.decomposition import MSTL
 
 
-def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
+def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True, fillna=True):
     """
     Converts a transaction df to a pivoted df.
     Each row is a unique id and columns are the dates.
@@ -14,6 +14,7 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
         target_frequency (str): Target frequency for resampling. Ex: 'D' for daily, 'W' for weekly.
         agg_func (str): The aggregation function. Options: 'sum', 'constant', None. Default: None.
         fill_values (bool): Whether or not to fill missing values with zeros. Default: True.
+        fillna (bool): Whether or not to fill missing values with zeros. Default: True.
 
     Returns:
         pd.DataFrame: A pivoted DataFrame.
@@ -50,15 +51,17 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
         elif agg_func == "constant":
             pivot_df = pivot_df.resample(target_frequency, axis=1).last()
 
-        # Fills missing values
-        if fill_values:
-            pivot_df = pivot_df.reindex(
-                columns=pd.date_range(
-                    pivot_df.columns.min(),
-                    pivot_df.columns.max(),
-                    freq=target_frequency,
-                )
+    # Fills missing values
+    if fill_values:
+        pivot_df = pivot_df.reindex(
+            columns=pd.date_range(
+                pivot_df.columns.min(),
+                pivot_df.columns.max(),
+                freq=target_frequency,
             )
+        )
+    if fillna:
+        pivot_df = pivot_df.fillna(0)
 
     return pivot_df
 
