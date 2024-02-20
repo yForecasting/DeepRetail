@@ -898,8 +898,8 @@ def calendar_heatmap(df, format, by):
         title = f"Year: {year}"
         ax[0].set_title(title, pad=20)
 
-        ax[0].set_xlabel(x_axis, labelpad=30)
-        ax[0].set_ylabel(y_axis, labelpad=30)
+        ax[0].set_xlabel(y_axis, labelpad=30)
+        ax[0].set_ylabel(x_axis, labelpad=30)
         ax[0].set_facecolor((gray_scale, gray_scale, gray_scale))
 
     fig.tight_layout(rect=[0, 0, 0.9, 1])
