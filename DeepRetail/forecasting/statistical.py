@@ -14,6 +14,8 @@ from statsforecast.models import (
     CrostonClassic,
     CrostonOptimized,
     CrostonSBA,
+    WindowAverage,
+    SeasonalWindowAverage,
 )
 import warnings
 import matplotlib.pyplot as plt
@@ -112,6 +114,7 @@ class StatisticalForecaster(object):
         seasonal_length=None,
         distributed=False,
         n_partitions=None,
+        window_size=None,
     ):
         """
         Initialize the StatisticalForecaster object.
@@ -172,6 +175,24 @@ class StatisticalForecaster(object):
         if "SBA" in models:
             models_to_fit.append(CrostonSBA())
             model_names.append("SBA")
+        if "WindowAverage" in models:
+            # Assert we have window size
+            assert (
+                window_size is not None
+            ), "Window size must be provided for WindowAverage"
+            models_to_fit.append(WindowAverage(window_size=window_size))
+            model_names.append("WindowAverage")
+        if "SeasonalWindowAverage" in models:
+            # Assert we have window size
+            assert (
+                window_size is not None
+            ), "Window size must be provided for SeasonalWindowAverage"
+            models_to_fit.append(
+                SeasonalWindowAverage(
+                    window_size=window_size, season_length=self.seasonal_length
+                )
+            )
+            model_names.append("SeasonalWindowAverage")
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
