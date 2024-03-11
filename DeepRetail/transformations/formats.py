@@ -2,7 +2,7 @@ import pandas as pd
 from DeepRetail.transformations.decomposition import MSTL
 
 
-def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
+def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True, fillna=True):
     """
     Converts a transaction df to a pivoted df.
     Each row is a unique id and columns are the dates.
@@ -14,6 +14,7 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
         target_frequency (str): Target frequency for resampling. Ex: 'D' for daily, 'W' for weekly.
         agg_func (str): The aggregation function. Options: 'sum', 'constant', None. Default: None.
         fill_values (bool): Whether or not to fill missing values with zeros. Default: True.
+        fillna (bool): Whether or not to fill missing values with zeros. Default: True.
 
     Returns:
         pd.DataFrame: A pivoted DataFrame.
@@ -50,15 +51,17 @@ def pivoted_df(df, target_frequency=None, agg_func=None, fill_values=True):
         elif agg_func == "constant":
             pivot_df = pivot_df.resample(target_frequency, axis=1).last()
 
-        # Fills missing values
-        if fill_values:
-            pivot_df = pivot_df.reindex(
-                columns=pd.date_range(
-                    pivot_df.columns.min(),
-                    pivot_df.columns.max(),
-                    freq=target_frequency,
-                )
+    # Fills missing values
+    if fill_values:
+        pivot_df = pivot_df.reindex(
+            columns=pd.date_range(
+                pivot_df.columns.min(),
+                pivot_df.columns.max(),
+                freq=target_frequency,
             )
+        )
+    if fillna:
+        pivot_df = pivot_df.fillna(0)
 
     return pivot_df
 
@@ -139,7 +142,9 @@ def sktime_forecast_format(df, format="transaction"):
     return df
 
 
-def statsforecast_forecast_format(df, format="transaction"):
+def statsforecast_forecast_format(
+    df, format="transaction", fill_missing=False, fill_value="nan"
+):
     """
     Converts a dataframe to the format required for forecasting with statsforecast.
 
@@ -148,6 +153,11 @@ def statsforecast_forecast_format(df, format="transaction"):
             The input data.
         format : str, default='transaction'
             The format of the input data. Can be 'transaction' or 'pivotted'.
+        fill_missing : bool, default=False
+            Whether to fill missing dates with NaN values. If True, the 'fill_value' argument
+            must be specified.
+        fill_value : str, int, float, default='nan'
+            The value to use for filling missing dates. Default is 'nan'.
 
     Returns:
         df : pd.DataFrame
@@ -159,6 +169,11 @@ def statsforecast_forecast_format(df, format="transaction"):
     if format == "transaction":
         # just rename the date column to ds
         df = df.rename(columns={"date": "ds"})
+
+        # fill missing dates if specified
+        if fill_missing:
+            df = fill_missing_dates(df, fill_value=fill_value)
+
     elif format == "pivotted":
         # if we have pivotted
         # we need to convert it to transaction
@@ -172,6 +187,46 @@ def statsforecast_forecast_format(df, format="transaction"):
 
     # Return
     return df
+
+
+def fill_missing_dates(df, fill_value="nan"):
+    """
+    Fills missing dates due to no sales.
+
+    Args:
+        df : pd.DataFrame
+            The input data, expected to have at least 'ds' (date), 'y' (target variable),
+            and 'unique_id' columns.
+        fill_value: str, int
+            The value to use for filling missing dates. Default is 'nan'.
+
+    Returns:
+        df : pd.DataFrame
+            The formatted DataFrame with a continuous date range for each 'unique_id',
+            filling missing dates with NaN values for 'y', and ensuring that the 'ds' column is
+            of datetime type. The returned DataFrame is sorted by 'unique_id' and 'ds'.
+    """
+
+    # Identify the full date range in the dataset
+    min_date, max_date = df["ds"].min(), df["ds"].max()
+    all_dates = pd.date_range(start=min_date, end=max_date, freq="D")
+
+    # Create a MultiIndex with all combinations of 'unique_id' and 'all_dates'
+    unique_ids = df["unique_id"].unique()
+    multi_index = pd.MultiIndex.from_product(
+        [unique_ids, all_dates], names=["unique_id", "ds"]
+    )
+
+    # Reindex the DataFrame to include missing dates
+    df_reindexed = df.set_index(["unique_id", "ds"]).reindex(multi_index).reset_index()
+
+    # Sort by 'unique_id' and 'ds'
+    df_reindexed = df_reindexed.sort_values(by=["unique_id", "ds"])
+
+    if fill_value != "nan":
+        df_reindexed = df_reindexed.fillna(fill_value)
+
+    return df_reindexed
 
 
 def extract_hierarchical_structure(

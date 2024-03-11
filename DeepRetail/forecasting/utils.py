@@ -82,7 +82,9 @@ def add_missing_values(input_features, input_transformations=None):
 
     # Default values for features and transformations dictionaries
     # Initialize a dictionary for transformations if it is none
-    input_transformations = {} if input_transformations is None else input_transformations
+    input_transformations = (
+        {} if input_transformations is None else input_transformations
+    )
 
     features = {
         "lags": None,
@@ -173,10 +175,12 @@ def window(a, window_size):
     # Calculate the strides for the windowed array
     st = a.strides * 2
     # Create the windowed array using as_strided method
-    view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[0::1]  # The step size is 1, i.e. no overlapping
+    view = np.lib.stride_tricks.as_strided(a, strides=st, shape=sh)[
+        0::1
+    ]  # The step size is 1, i.e. no overlapping
 
     # Discard windows with all zeros
-    view = view[~np.all(view == 0, axis=1)]
+    # view = view[~np.all(view == 0, axis=1)]
 
     return view
 
@@ -198,17 +202,27 @@ def create_lags(df, lags):
 
     """
 
-    lags_df = df.apply(lambda x: augment(x.values, lags).squeeze(), axis=1).to_frame(name="lag_windows")
+    lags_df = df.apply(lambda x: augment(x.values, lags).squeeze(), axis=1).to_frame(
+        name="lag_windows"
+    )
 
     return lags_df
 
 
-def construct_single_rolling_feature(df, rolling_aggregation, original_lags, rolling_windows, rolling_lags=1):
+def construct_single_rolling_feature(
+    df, rolling_aggregation, original_lags, rolling_windows, rolling_lags=1
+):
     # Check if rolling_window is integer and convert to list
-    rolling_windows = [rolling_windows] if isinstance(rolling_windows, int) else rolling_windows
+    rolling_windows = (
+        [rolling_windows] if isinstance(rolling_windows, int) else rolling_windows
+    )
 
     # In case rolling_lags has a single value, repeat it for the number of rolling windows
-    rolling_lags = np.repeat(rolling_lags, len(rolling_windows)) if isinstance(rolling_lags, int) else rolling_lags
+    rolling_lags = (
+        np.repeat(rolling_lags, len(rolling_windows))
+        if isinstance(rolling_lags, int)
+        else rolling_lags
+    )
 
     # Initialize a dataframe to include all rolling features
     rolling_df = pd.DataFrame()
@@ -224,7 +238,10 @@ def construct_single_rolling_feature(df, rolling_aggregation, original_lags, rol
         temp_df = create_lags(temp_df, original_lags)
         # Keep only the specified amount and round the subwindow
         # temp_df['lag_windows'] = [subwindows[:, -temp_lag:] for subwindows in temp_df['lag_windows'].values]
-        temp_df["lag_windows"] = [subwindows[:, -temp_lag:].round(3) for subwindows in temp_df["lag_windows"].values]
+        temp_df["lag_windows"] = [
+            subwindows[:, -temp_lag:].round(3)
+            for subwindows in temp_df["lag_windows"].values
+        ]
         # rename
         temp_df = temp_df.rename(columns={"lag_windows": name})
 
@@ -263,25 +280,31 @@ def split_lag_targets(df, test_size=1):
     if test_size == 1:
         # df["targets"] = [subwindows[:, -1].reshape(-1, 1) for subwindows in df["lag_windows"].values]
         df["targets"] = [
-            subwindows[:, -1].reshape(-1, 1)
-            if len(subwindows.shape) == 2
-            else subwindows.reshape(1, -1)[:, -1].reshape(-1, 1)
+            (
+                subwindows[:, -1].reshape(-1, 1)
+                if len(subwindows.shape) == 2
+                else subwindows.reshape(1, -1)[:, -1].reshape(-1, 1)
+            )
             for subwindows in df["lag_windows"].values
         ]
     else:
         # df["targets"] = [subwindows[:, -test_size:] for subwindows in df["lag_windows"].values]
         df["targets"] = [
-            subwindows[:, -test_size:].reshape(-1, 1)
-            if len(subwindows.shape) == 2
-            else subwindows.reshape(1, -1)[:, -test_size:].reshape(-1, 1)
+            (
+                subwindows[:, -test_size:].reshape(-1, 1)
+                if len(subwindows.shape) == 2
+                else subwindows.reshape(1, -1)[:, -test_size:].reshape(-1, 1)
+            )
             for subwindows in df["lag_windows"].values
         ]
     # lagged values are all values until the last one
     # df["lagged_values"] = [subwindows[:, :-test_size] for subwindows in df["lag_windows"].values]
     df["lagged_values"] = [
-        subwindows[:, :-test_size]
-        if len(subwindows.shape) == 2
-        else subwindows.reshape(1, -1)[:, :-test_size].reshape(-1, 1)
+        (
+            subwindows[:, :-test_size]
+            if len(subwindows.shape) == 2
+            else subwindows.reshape(1, -1)[:, :-test_size].reshape(-1, 1)
+        )
         for subwindows in df["lag_windows"].values
     ]
 
@@ -321,9 +344,14 @@ def standard_scaler_custom(df, mode="train"):
     # If std is zero or nan skip the division.
     df["normalized_lagged_values"] = [
         np.array(
-            [(subwindow - mu) / std if std[0] > 0 else subwindow - mu for subwindow, mu, std in zip(windows, mus, stds)]
+            [
+                (subwindow - mu) / std if std[0] > 0 else subwindow - mu
+                for subwindow, mu, std in zip(windows, mus, stds)
+            ]
         ).tolist()
-        for windows, mus, stds in zip(df["lagged_values"].values, df["mus"].values, df["stds"].values)
+        for windows, mus, stds in zip(
+            df["lagged_values"].values, df["mus"].values, df["stds"].values
+        )
     ]
 
     # If we have rolling features
@@ -339,7 +367,9 @@ def standard_scaler_custom(df, mode="train"):
                         for subwindow, mu, std in zip(windows, mus, stds)
                     ]
                 ).tolist()
-                for windows, mus, stds in zip(df[rolling_col].values, df["mus"].values, df["stds"].values)
+                for windows, mus, stds in zip(
+                    df[rolling_col].values, df["mus"].values, df["stds"].values
+                )
             ]
             # drop the old rolling column
             df = df.drop(columns=rolling_col)
@@ -347,11 +377,16 @@ def standard_scaler_custom(df, mode="train"):
     if mode == "train":
         df["normalized_targets"] = [
             np.array(
-                [(target - mu) / std if std[0] > 0 else target - mu for target, mu, std in zip(targets, mus, stds)]
+                [
+                    (target - mu) / std if std[0] > 0 else target - mu
+                    for target, mu, std in zip(targets, mus, stds)
+                ]
             )
             .reshape(-1, 1)
             .tolist()
-            for targets, mus, stds in zip(df["targets"].values, df["mus"].values, df["stds"].values)
+            for targets, mus, stds in zip(
+                df["targets"].values, df["mus"].values, df["stds"].values
+            )
         ]
 
     else:
@@ -360,3 +395,56 @@ def standard_scaler_custom(df, mode="train"):
         df["stds"] = df["stds"].apply(lambda x: x[0][0])
 
     return df
+
+
+def add_fh_cv(forecast_df, holdout):
+    """
+    Adds the forecasting horizon and cross-validation information to the forecast results.
+
+    Args:
+        forecast_df (pd.DataFrame):
+            The df containing the forecasted results.
+        holdout (bool):
+            Whether the forecast is a holdout forecast.
+
+    Returns:
+        pd.DataFrame:
+            The df containing the forecasted results with the forecasting horizon and cross-validation information.
+    """
+
+    # add the number of cv and fh
+    if holdout:
+        cv_vals = sorted(forecast_df["cutoff"].unique())
+        cv_dict = dict(zip(cv_vals, np.arange(1, len(cv_vals) + 1)))
+
+        # Initialize a new dataframe
+        updated_forecast_df = pd.DataFrame()
+
+        # Itterate over cvs
+        for cv in cv_vals:
+            temp_df = forecast_df[forecast_df["cutoff"] == cv].copy()
+            temp_df["cv"] = cv_dict[cv]
+
+            # take the fh_vals
+            fh_vals = sorted(temp_df["date"].unique())
+            fh_dict = dict(zip(fh_vals, np.arange(1, len(fh_vals) + 1)))
+
+            # add the fh
+            temp_df["fh"] = temp_df["date"].map(fh_dict)
+
+            # Concate
+            updated_forecast_df = pd.concat([updated_forecast_df, temp_df])
+
+        forecast_df = updated_forecast_df
+
+    else:
+        # get the forecasted dates
+        dates = forecast_df["date"].unique()
+        # get a dictionary of dates and their corresponding fh
+        fh_dict = dict(zip(dates, np.arange(1, len(dates) + 1)))
+        # add the fh
+        forecast_df["fh"] = [fh_dict[date] for date in forecast_df["date"].values]
+        # also add the cv
+        forecast_df["cv"] = None
+
+    return forecast_df

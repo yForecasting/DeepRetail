@@ -156,18 +156,14 @@ def compute_matrix_S_temporal(factors):
     max_freq = max(factors)
 
     # initialize a list of numpy arrays for every factor
-    S_thief = [
-        np.zeros((max_freq // factors[k], max_freq)) for k in range(total_factors)
-    ]
+    S_thief = [np.zeros((max_freq // factors[k], max_freq)) for k in range(total_factors)]
 
     # loop through the factors
     for k in range(total_factors):
         # loop through the frequencies
         for i in range(max_freq // factors[k]):
             # populate the S_thief matrix
-            S_thief[k][
-                i, factors[k] * i : factors[k] + factors[k] * i  # noqa: E203
-            ] = 1
+            S_thief[k][i, factors[k] * i : factors[k] + factors[k] * i] = 1  # noqa: E203
 
     # reverse the order of the stacked levels
     S_thief = S_thief[::-1]
@@ -201,9 +197,7 @@ def resample_temporal_level(df, factor, bottom_freq, resampled_freq):
         # if not, drop observations from the beginning
         df = df.iloc[:, total_obs % factor :]  # noqa: E203
 
-    resample_df = df.resample(
-        str(factor) + bottom_freq, closed="left", label="left", axis=1
-    ).sum()
+    resample_df = df.resample(str(factor) + bottom_freq, closed="left", label="left", axis=1).sum()
 
     # change the frequency of the columns to the resampled_freq
     # resample_df.columns = pd.to_datetime(resample_df.columns).to_period(resampled_freq)
@@ -279,7 +273,8 @@ def get_w_matrix_structural(frequencies, total_ts):
     nsum = np.flip(np.repeat(m, frequencies))
 
     # Get the weights
-    weights = [1 / weight for weight in nsum]
+    # weights = [1 / weight for weight in nsum]
+    weights = nsum.copy()  # will reverse later
 
     # Then convert to diagonal
     W_inv = np.diag(weights)
@@ -400,7 +395,9 @@ def get_w_matrix_mse(res_df, factors):
         # take the values of the mse
         temp_mse = temp_df["residual_squarred"].values
         # get the weights for each level
-        temp_weights = 1 / temp_mse
+        # temp_weights = 1 / temp_mse
+        temp_weights = temp_mse.copy()  # will reverse later
+
         # Convert to diagonal matrix
         temp_W = np.diag(temp_weights)
         # Ensure no infs or nans.
@@ -542,9 +539,7 @@ def shrink_estim(res, cov_mat):
     xs = xs[~np.isnan(xs).any(axis=1), :]
 
     # calculate v
-    v = (1 / (n * (n - 1))) * (
-        cross_product(xs**2) - (1 / n) * (cross_product(xs) ** 2)
-    )
+    v = (1 / (n * (n - 1))) * (cross_product(xs**2) - (1 / n) * (cross_product(xs) ** 2))
     # Set the diagonal elements to zero
     np.fill_diagonal(v, 0)
 

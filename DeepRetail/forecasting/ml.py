@@ -90,8 +90,19 @@ class GlobalForecaster(object):
                     )
                 # Drop the rolling columns if memory gets large
                 # lag_df.drop(rolling_columns, axis = 1, inplace = True)
-            x_train = np.concatenate(self.lag_df["normalized_lagged_values"].values)
-            y_train = np.concatenate(self.lag_df["normalized_targets"].values)
+
+            # Filter out empty rows and concatenate
+            # Step 1: Identify valid indices where 'normalized_lagged_values' has more than one dimension
+            valid_indices = self.lag_df[self.lag_df["normalized_lagged_values"].apply(lambda x: np.ndim(x) > 1)].index
+
+            # Step 2: Use valid indices to filter both columns
+            filtered_values = self.lag_df.loc[valid_indices, "normalized_lagged_values"].values
+            filtered_targets = self.lag_df.loc[valid_indices, "normalized_targets"].values
+
+            # Step 3: Perform concatenation on filtered columns
+            x_train = np.concatenate(filtered_values)
+            y_train = np.concatenate(filtered_targets)
+
         else:
             # Repeat for non-normalized elements
             # If we have rolling features
@@ -108,8 +119,18 @@ class GlobalForecaster(object):
                 # Drop the rolling columns
                 # lag_df.drop(rolling_columns, axis = 1, inplace = True)
             # if not take tha lagged values
-            x_train = np.concatenate(self.lag_df["lagged_values"].values)
-            y_train = np.concatenate(self.lag_df["targets"].values)
+
+            # Filter out empty rows and concatenate
+            # Step 1: Identify valid indices where 'normalized_lagged_values' has more than one dimension
+            valid_indices = self.lag_df[self.lag_df["lagged_values"].apply(lambda x: np.ndim(x) > 1)].index
+
+            # Step 2: Use valid indices to filter both columns
+            filtered_values = self.lag_df.loc[valid_indices, "lagged_values"].values
+            filtered_targets = self.lag_df.loc[valid_indices, "targets"].values
+
+            # Step 3: Perform concatenation on filtered columns
+            x_train = np.concatenate(filtered_values)
+            y_train = np.concatenate(filtered_targets)
 
         # Fit the model.
         self.model.fit(x_train, y_train.ravel())
