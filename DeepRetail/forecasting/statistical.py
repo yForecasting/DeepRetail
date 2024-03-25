@@ -1,22 +1,17 @@
 import numpy as np
 import pandas as pd
-from DeepRetail.forecasting.utils import get_numeric_frequency, add_fh_cv
+from DeepRetail.forecasting.utils import (
+    get_numeric_frequency,
+    add_fh_cv,
+    model_selection,
+)
+from statsforecast.models import Naive
 from DeepRetail.transformations.formats import (
     transaction_df,
     statsforecast_forecast_format,
 )
 from statsforecast import StatsForecast
-from statsforecast.models import (
-    AutoETS,
-    AutoARIMA,
-    Naive,
-    SeasonalNaive,
-    CrostonClassic,
-    CrostonOptimized,
-    CrostonSBA,
-    WindowAverage,
-    SeasonalWindowAverage,
-)
+
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -115,6 +110,7 @@ class StatisticalForecaster(object):
         distributed=False,
         n_partitions=None,
         window_size=None,
+        seasonal_window_size=None,
     ):
         """
         Initialize the StatisticalForecaster object.
@@ -153,46 +149,10 @@ class StatisticalForecaster(object):
         models_to_fit = []
         model_names = []
 
-        # Append to the list
-        if "Naive" in models:
-            models_to_fit.append(Naive())
-            model_names.append("Naive")
-        if "SNaive" in models:
-            models_to_fit.append(SeasonalNaive(season_length=self.seasonal_length))
-            model_names.append("Seasonal Naive")
-        if "ARIMA" in models:
-            models_to_fit.append(AutoARIMA(season_length=self.seasonal_length))
-            model_names.append("ARIMA")
-        if "ETS" in models:
-            models_to_fit.append(AutoETS(season_length=self.seasonal_length))
-            model_names.append("ETS")
-        if "CrostonClassic" in models:
-            models_to_fit.append(CrostonClassic())
-            model_names.append("CrostonClassic")
-        if "CrostonOptimized" in models:
-            models_to_fit.append(CrostonOptimized())
-            model_names.append("CrostonOptimized")
-        if "SBA" in models:
-            models_to_fit.append(CrostonSBA())
-            model_names.append("SBA")
-        if "WindowAverage" in models:
-            # Assert we have window size
-            assert (
-                window_size is not None
-            ), "Window size must be provided for WindowAverage"
-            models_to_fit.append(WindowAverage(window_size=window_size))
-            model_names.append("WindowAverage")
-        if "SeasonalWindowAverage" in models:
-            # Assert we have window size
-            assert (
-                window_size is not None
-            ), "Window size must be provided for SeasonalWindowAverage"
-            models_to_fit.append(
-                SeasonalWindowAverage(
-                    window_size=window_size, season_length=self.seasonal_length
-                )
-            )
-            model_names.append("SeasonalWindowAverage")
+        # Converts models to statsforecast objects
+        models_to_fit, model_names = model_selection(
+            models, self.seasonal_length, window_size, seasonal_window_size
+        )
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
