@@ -144,3 +144,10 @@ DeepRetail/example_notebooks/forecasts_sample.csv
 .vscode
 DeepRetail/m5_month_sample_for_students.csv:Zone.Identifier
 DeepRetail/example_notebooks/sample_for_developers.ipynb
+
+.venv/
+.vscode/
+.DS_Store
+.gitignore
+.gitignore
+.idea/

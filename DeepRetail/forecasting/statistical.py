@@ -18,8 +18,10 @@ from matplotlib.gridspec import GridSpec
 from statsmodels.tsa.stattools import acf
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 import dask.dataframe as dd
-from dask.distributed import Client
-from fugue_dask import DaskExecutionEngine
+
+# from dask.distributed import Client
+
+# from fugue_dask import DaskExecutionEngine
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 
@@ -160,9 +162,9 @@ class StatisticalForecaster(object):
         self.distributed = distributed
         self.n_partitions = n_partitions
         # Initiate FugueBackend with DaskExecutionEngine if distributed is True
-        if self.distributed:
-            dask_client = Client()
-            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
+        # if self.distributed:
+        # dask_client = Client()
+        # engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
@@ -257,7 +259,7 @@ class StatisticalForecaster(object):
         self.h = h
         self.holdout = holdout
         self.step_size = step_size
-        self.refit = refit
+        # self.refit = refit
 
         if holdout:
             # Get the cross_validation
@@ -276,7 +278,7 @@ class StatisticalForecaster(object):
                     h=self.h,
                     step_size=self.step_size,
                     n_windows=self.cv,
-                    refit=self.refit,
+                    # refit=self.refit,
                 )
 
             # edit the format
@@ -638,9 +640,9 @@ class SeasonalDecomposeForecaster(object):
         self.distributed = distributed
         self.n_partitions = n_partitions
         # Initiate FugueBackend with DaskExecutionEngine if distributed is True
-        if self.distributed:
-            dask_client = Client()
-            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
+        # if self.distributed:
+        # dask_client = Client()
+        # engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
