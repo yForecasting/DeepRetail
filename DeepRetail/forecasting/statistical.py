@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from statsmodels.tsa.stattools import acf
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
-import dask.dataframe as dd
+
+# import dask.dataframe as dd
 
 # from dask.distributed import Client
 
@@ -217,9 +218,9 @@ class StatisticalForecaster(object):
             )
 
         # Check if we have distributed training
-        if self.distributed:
-            # Convert the df to a dask dataframe
-            fc_df = dd.from_pandas(fc_df, npartitions=self.n_partitions)
+        # if self.distributed:
+        # Convert the df to a dask dataframe
+        # fc_df = dd.from_pandas(fc_df, npartitions=self.n_partitions)
 
         # Add to the object
         self.fc_df = fc_df
