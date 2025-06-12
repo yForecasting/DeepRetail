@@ -1,5 +1,5 @@
 # DeepRetail
-<img src="https://img.shields.io/badge/Maintained%20by-Vives%20AI%20Lab-red"> [![Downloads](https://static.pepy.tech/personalized-badge/DeepRetail?period=total&units=international_system&left_color=grey&right_color=blue&left_text=downloads)](https://pepy.tech/project/DeepRetail) <img src="https://img.shields.io/badge/python-v3.7%2B-blue"> <img src="https://img.shields.io/badge/pypi-v0.0.4-blue">
+<img src="https://img.shields.io/badge/Maintained%20by-Vives%20AI%20Lab-red"> [![Downloads](https://static.pepy.tech/personalized-badge/DeepRetail?period=total&units=international_system&left_color=grey&right_color=blue&left_text=downloads)](https://pepy.tech/project/DeepRetail) <img src="https://img.shields.io/badge/python-v3.7%2B-blue"> <img src="https://img.shields.io/badge/pypi-v0.0.9-blue">
 
 Python package on deep learning AI and machine learning for Retail
 
@@ -83,4 +83,4 @@ Start by reviewing the [contribution guidelines](https://github.com/yForecasting
 
 ## Support
 
-The [AI team](https://yforecasting.github.io/) at VIVES University of Applied Sciences builds and maintains `DeepRetail` to make it simple and accessible. We are using this software in our research on [demand forecasting](https://yvesrsagaert.wordpress.com/). A special thanks to Ruben Vanhecke and Filotas Theodosiou for their contribution.
+The [AI team](https://yforecasting.github.io/) at VIVES University of Applied Sciences builds and maintains `DeepRetail` to make it simple and accessible. We are using this software in our research on [demand forecasting](https://yvesrsagaert.wordpress.com/). A special thanks to Ruben Vanhecke and Filotas Theodosiou for their contribution. The [maintenance workflow](https://github.com/yForecasting/DeepRetail/blob/main/MAINTAINING.md) can be found here.

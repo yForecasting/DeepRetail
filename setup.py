@@ -13,8 +13,8 @@ setuptools.setup(
     author_email="yves.r.sagaert@gmail.com",
     name="DeepRetail",
     license="GNU GPLv3",
-    description="Forecasting package for retail using Deep Learning AI.",
-    version="v0.0.4",
+    description='Forecasting package for retail using Deep Learning AI.',
+    version='v0.1.0',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/yForecasting/DeepRetail",
@@ -37,7 +37,7 @@ setuptools.setup(
         "openpyxl>=3.0.0",
         "tsfeatures>=0.4.0",
         "python-dateutil>=2.8.0",
-        "tqdm>=4.64.0",
+        "tqdm>=4.64.0"
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
