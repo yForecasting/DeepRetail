@@ -1,30 +1,28 @@
 import numpy as np
 import pandas as pd
-from DeepRetail.forecasting.utils import get_numeric_frequency, add_fh_cv
+from DeepRetail.forecasting.utils import (
+    get_numeric_frequency,
+    add_fh_cv,
+    model_selection,
+)
+from statsforecast.models import Naive
 from DeepRetail.transformations.formats import (
     transaction_df,
     statsforecast_forecast_format,
 )
 from statsforecast import StatsForecast
-from statsforecast.models import (
-    AutoETS,
-    AutoARIMA,
-    Naive,
-    SeasonalNaive,
-    CrostonClassic,
-    CrostonOptimized,
-    CrostonSBA,
-    WindowAverage,
-    SeasonalWindowAverage,
-)
+
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from statsmodels.tsa.stattools import acf
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
-import dask.dataframe as dd
-from dask.distributed import Client
-from fugue_dask import DaskExecutionEngine
+
+# import dask.dataframe as dd
+
+# from dask.distributed import Client
+
+# from fugue_dask import DaskExecutionEngine
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 
@@ -115,6 +113,7 @@ class StatisticalForecaster(object):
         distributed=False,
         n_partitions=None,
         window_size=None,
+        seasonal_window_size=None,
     ):
         """
         Initialize the StatisticalForecaster object.
@@ -153,46 +152,10 @@ class StatisticalForecaster(object):
         models_to_fit = []
         model_names = []
 
-        # Append to the list
-        if "Naive" in models:
-            models_to_fit.append(Naive())
-            model_names.append("Naive")
-        if "SNaive" in models:
-            models_to_fit.append(SeasonalNaive(season_length=self.seasonal_length))
-            model_names.append("Seasonal Naive")
-        if "ARIMA" in models:
-            models_to_fit.append(AutoARIMA(season_length=self.seasonal_length))
-            model_names.append("ARIMA")
-        if "ETS" in models:
-            models_to_fit.append(AutoETS(season_length=self.seasonal_length))
-            model_names.append("ETS")
-        if "CrostonClassic" in models:
-            models_to_fit.append(CrostonClassic())
-            model_names.append("CrostonClassic")
-        if "CrostonOptimized" in models:
-            models_to_fit.append(CrostonOptimized())
-            model_names.append("CrostonOptimized")
-        if "SBA" in models:
-            models_to_fit.append(CrostonSBA())
-            model_names.append("SBA")
-        if "WindowAverage" in models:
-            # Assert we have window size
-            assert (
-                window_size is not None
-            ), "Window size must be provided for WindowAverage"
-            models_to_fit.append(WindowAverage(window_size=window_size))
-            model_names.append("WindowAverage")
-        if "SeasonalWindowAverage" in models:
-            # Assert we have window size
-            assert (
-                window_size is not None
-            ), "Window size must be provided for SeasonalWindowAverage"
-            models_to_fit.append(
-                SeasonalWindowAverage(
-                    window_size=window_size, season_length=self.seasonal_length
-                )
-            )
-            model_names.append("SeasonalWindowAverage")
+        # Converts models to statsforecast objects
+        models_to_fit, model_names = model_selection(
+            models, self.seasonal_length, window_size, seasonal_window_size
+        )
 
         self.fitted_models = models_to_fit
         self.model_names = model_names
@@ -200,9 +163,9 @@ class StatisticalForecaster(object):
         self.distributed = distributed
         self.n_partitions = n_partitions
         # Initiate FugueBackend with DaskExecutionEngine if distributed is True
-        if self.distributed:
-            dask_client = Client()
-            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
+        # if self.distributed:
+        # dask_client = Client()
+        # engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """
@@ -255,9 +218,9 @@ class StatisticalForecaster(object):
             )
 
         # Check if we have distributed training
-        if self.distributed:
-            # Convert the df to a dask dataframe
-            fc_df = dd.from_pandas(fc_df, npartitions=self.n_partitions)
+        # if self.distributed:
+        # Convert the df to a dask dataframe
+        # fc_df = dd.from_pandas(fc_df, npartitions=self.n_partitions)
 
         # Add to the object
         self.fc_df = fc_df
@@ -297,7 +260,7 @@ class StatisticalForecaster(object):
         self.h = h
         self.holdout = holdout
         self.step_size = step_size
-        self.refit = refit
+        # self.refit = refit
 
         if holdout:
             # Get the cross_validation
@@ -316,7 +279,7 @@ class StatisticalForecaster(object):
                     h=self.h,
                     step_size=self.step_size,
                     n_windows=self.cv,
-                    refit=self.refit,
+                    # refit=self.refit,
                 )
 
             # edit the format
@@ -678,9 +641,9 @@ class SeasonalDecomposeForecaster(object):
         self.distributed = distributed
         self.n_partitions = n_partitions
         # Initiate FugueBackend with DaskExecutionEngine if distributed is True
-        if self.distributed:
-            dask_client = Client()
-            engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
+        # if self.distributed:
+        # dask_client = Client()
+        # engine = DaskExecutionEngine(dask_client=dask_client)  # noqaf841
 
     def fit(self, df, format="pivoted", fallback=True, verbose=False):
         """

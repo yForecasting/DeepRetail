@@ -1,6 +1,19 @@
 from pandas.tseries.frequencies import to_offset
 import numpy as np
 import pandas as pd
+from statsforecast.models import (
+    AutoETS,
+    AutoARIMA,
+    Naive,
+    SeasonalNaive,
+    CrostonClassic,
+    CrostonOptimized,
+    CrostonSBA,
+    WindowAverage,
+    SeasonalWindowAverage,
+    AutoCES,
+    AutoTheta,
+)
 
 
 def get_numeric_frequency(freq):
@@ -448,3 +461,61 @@ def add_fh_cv(forecast_df, holdout):
         forecast_df["cv"] = None
 
     return forecast_df
+
+
+def model_selection(models, seasonal_length, window_size, seasonal_window_size):
+    "Takes models in a list of strings and returns a list of Statsforecast objects"
+
+    # Initiate the lists
+    # Add the models and their names
+    models_to_fit = []
+    model_names = []
+
+    # Append to the list
+    if "Naive" in models:
+        models_to_fit.append(Naive())
+        model_names.append("Naive")
+    if "SNaive" in models:
+        models_to_fit.append(SeasonalNaive(season_length=seasonal_length))
+        model_names.append("Seasonal Naive")
+    if "ARIMA" in models:
+        models_to_fit.append(AutoARIMA(season_length=seasonal_length))
+        model_names.append("ARIMA")
+    if "ETS" in models:
+        models_to_fit.append(AutoETS(season_length=seasonal_length))
+        model_names.append("ETS")
+    if "CrostonClassic" in models:
+        models_to_fit.append(CrostonClassic())
+        model_names.append("CrostonClassic")
+    if "CrostonOptimized" in models:
+        models_to_fit.append(CrostonOptimized())
+        model_names.append("CrostonOptimized")
+    if "SBA" in models:
+        models_to_fit.append(CrostonSBA())
+        model_names.append("SBA")
+    if "WindowAverage" in models:
+        # Assert we have window size
+        assert window_size is not None, "Window size must be provided for WindowAverage"
+        models_to_fit.append(WindowAverage(window_size=window_size))
+        model_names.append("WindowAverage")
+    if "SeasonalWindowAverage" in models:
+        # Assert we have window size
+        assert (
+            seasonal_window_size is not None
+        ), "Window size must be provided for SeasonalWindowAverage"
+        models_to_fit.append(
+            SeasonalWindowAverage(
+                window_size=seasonal_window_size, season_length=seasonal_length
+            )
+        )
+        model_names.append("SeasonalWindowAverage")
+
+    if "CES" in models:
+        models_to_fit.append(AutoCES(season_length=seasonal_length))
+        model_names.append("CES")
+
+    if "Theta" in models:
+        models_to_fit.append(AutoTheta(season_length=seasonal_length))
+        model_names.append("Theta")
+
+    return models_to_fit, model_names
